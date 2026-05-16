@@ -1,29 +1,33 @@
 ```
-project/
-├── app.py                 # Главный файл приложения
-├── .env                   # Переменные окружения
-├── .env.example          # Шаблон переменных окружения
-├── requirements.txt      # Зависимости
-├── config.py             # Конфигурация приложения
-├── database.py           # Работа с базой данных
-├── models/               # ПАКЕТ моделей данных
+economic_dashboard/
+├── app.py                          # Главный файл приложения
+├── config.py                       # Конфигурация (env)
+├── database.py                     # Работа с БД и пул соединений
+├── requirements.txt                # Зависимости
+├── .env                           # Переменные окружения (создать самому)
+├── .env.example                   # Шаблон env
+├── fix_database.py                # Скрипт исправления БД
+├── reset_database.py              # Скрипт сброса БД
+├── test_csv_import.py             # Тест импорта CSV
+├── models/                        # Модели данных
 │   ├── __init__.py
 │   ├── country.py
 │   ├── indicator.py
 │   └── stats.py
-├── routes/               # ПАКЕТ маршрутов
+├── routes/                        # Маршруты API
 │   ├── __init__.py
 │   ├── countries.py
 │   ├── indicators.py
 │   └── main.py
-├── services/             # ПАКЕТ сервисов
+├── services/                      # Бизнес-логика
 │   ├── __init__.py
 │   ├── country_service.py
-│   └── indicator_service.py
-├── utils/                # ПАКЕТ утилит
+│   ├── indicator_service.py
+│   └── csv_import_service.py
+├── utils/                         # Утилиты
 │   ├── __init__.py
 │   └── validators.py
-└── templates/
+└── templates/                     # HTML шаблоны
     └── index.html
 ```
 

@@ -6,98 +6,56 @@
     <title>Экономические показатели стран</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Segoe UI', sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             padding: 20px;
         }
-
         .container {
             max-width: 1400px;
             margin: 0 auto;
             background: white;
             border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
             overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
         }
-
         .header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             padding: 30px;
             text-align: center;
         }
-
-        .header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
-        }
-
-        .content {
-            padding: 30px;
-        }
-
+        .content { padding: 30px; }
         .controls {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
             margin-bottom: 30px;
             padding: 20px;
             background: #f7f7f7;
             border-radius: 10px;
         }
-
-        .control-group {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .control-group label {
-            font-weight: 600;
-            margin-bottom: 5px;
-            color: #333;
-        }
-
         select, input, button {
             padding: 10px;
             border: 2px solid #e0e0e0;
             border-radius: 8px;
             font-size: 14px;
-            transition: all 0.3s;
         }
-
-        select:focus, input:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-
         button {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             cursor: pointer;
-            font-weight: 600;
             border: none;
         }
-
-        button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-        }
-
+        button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
         .stats {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 20px;
             margin-bottom: 30px;
         }
-
         .stat-card {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -105,278 +63,60 @@
             border-radius: 10px;
             text-align: center;
         }
-
-        .stat-card h3 {
-            font-size: 14px;
-            opacity: 0.9;
-            margin-bottom: 10px;
-        }
-
-        .stat-card .value {
-            font-size: 28px;
-            font-weight: bold;
-        }
-
         .charts {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 30px;
             margin-bottom: 30px;
         }
-
         .chart-container {
             background: white;
             padding: 20px;
             border-radius: 10px;
             box-shadow: 0 5px 15px rgba(0,0,0,0.1);
         }
-
-        .chart-container h3 {
-            margin-bottom: 15px;
-            color: #333;
-        }
-
-        .data-table {
-            overflow-x: auto;
-            margin-top: 30px;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        th, td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #e0e0e0;
-        }
-
-        th {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            font-weight: 600;
-        }
-
-        tr:hover {
-            background: #f7f7f7;
-        }
-
-        .add-data {
-            margin-top: 30px;
-            padding: 20px;
-            background: #f7f7f7;
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            background: #f9f9f9;
             border-radius: 10px;
+            margin: 20px 0;
         }
-
-        .add-data h3 {
-            margin-bottom: 15px;
-            color: #333;
-        }
-
-        .form-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
+        .empty-state h3 {
+            color: #666;
             margin-bottom: 15px;
         }
-
-        @media (max-width: 768px) {
-            .charts {
-                grid-template-columns: 1fr;
-            }
+        .empty-state p {
+            color: #999;
+            margin-bottom: 20px;
         }
-        /* CSV Import Styles */
+        .empty-state button {
+            background: #667eea;
+            padding: 12px 24px;
+            font-size: 16px;
+        }
         .csv-import-section {
             margin-top: 40px;
             padding: 25px;
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            background: #f5f7fa;
             border-radius: 15px;
         }
-        
-        .csv-import-section h3 {
-            margin-bottom: 20px;
-            color: #333;
-        }
-        
         .import-controls {
             display: flex;
             gap: 15px;
             margin-bottom: 20px;
             flex-wrap: wrap;
         }
-        
-        .file-input {
-            flex: 1;
-            padding: 10px;
-            border: 2px solid #ddd;
-            border-radius: 8px;
-            background: white;
-        }
-        
-        .btn-secondary {
-            background: #6c757d;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        
-        .btn-secondary:hover {
-            background: #5a6268;
-            transform: translateY(-2px);
-        }
-        
-        .btn-primary {
-            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-        }
-        
-        .preview-header {
-            margin-bottom: 20px;
-        }
-        
-        .mapping-controls {
-            margin: 15px 0;
+        .info-message {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
             padding: 15px;
-            background: white;
-            border-radius: 8px;
-        }
-        
-        .mapping-options {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 10px;
-            margin: 15px 0;
-        }
-        
-        .mapping-item {
-            display: flex;
-            flex-direction: column;
-        }
-        
-        .mapping-item label {
-            font-size: 12px;
-            font-weight: 600;
-            margin-bottom: 5px;
-            color: #666;
-        }
-        
-        .mapping-item select {
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 14px;
-        }
-        
-        .preview-table {
-            overflow-x: auto;
-            max-height: 400px;
-            overflow-y: auto;
-        }
-        
-        .preview-table table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-        }
-        
-        .preview-table th {
-            background: #667eea;
-            color: white;
-            padding: 10px;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
-        
-        .preview-table td {
-            padding: 8px;
-            border-bottom: 1px solid #eee;
-        }
-        
-        .progress-bar {
-            width: 100%;
-            height: 30px;
-            background: #e0e0e0;
-            border-radius: 15px;
-            overflow: hidden;
             margin: 20px 0;
-        }
-        
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #28a745, #20c997);
-            transition: width 0.3s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: bold;
-        }
-        
-        .import-result {
-            padding: 15px;
             border-radius: 8px;
-            margin-top: 15px;
         }
-        
-        .import-result.success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
+        @media (max-width: 768px) {
+            .charts { grid-template-columns: 1fr; }
         }
-        
-        .import-result.error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        
-        .import-result.warning {
-            background: #fff3cd;
-            color: #856404;
-            border: 1px solid #ffeeba;
-        }
-        
-        .stats-summary {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-        
-        .stat-item {
-            background: white;
-            padding: 10px;
-            border-radius: 8px;
-            text-align: center;
-        }
-        
-        .stat-item .label {
-            font-size: 12px;
-            color: #666;
-        }
-        
-        .stat-item .value {
-            font-size: 24px;
-            font-weight: bold;
-            color: #333;
-        }
-
-
     </style>
 </head>
 <body>
@@ -385,576 +125,279 @@
             <h1>📊 Экономические показатели стран</h1>
             <p>Визуализация экспорта, импорта и ВВП</p>
         </div>
-
+        
         <div class="content">
+            <!-- Фильтры -->
             <div class="controls">
-                <div class="control-group">
-                    <label>🌍 Выберите страну</label>
-                    <select id="countrySelect">
-                        <option value="">Все страны</option>
-                    </select>
-                </div>
-                <div class="control-group">
-                    <label>📈 Тип показателя</label>
-                    <select id="indicatorType">
-                        <option value="all">Все показатели</option>
-                        <option value="export">Экспорт</option>
-                        <option value="import">Импорт</option>
-                        <option value="gdp">ВВП</option>
-                    </select>
-                </div>
-                <div class="control-group">
-                    <label>📅 Год от</label>
-                    <input type="number" id="startYear" placeholder="Начальный год">
-                </div>
-                <div class="control-group">
-                    <label>📅 Год до</label>
-                    <input type="number" id="endYear" placeholder="Конечный год">
-                </div>
-                <div class="control-group">
-                    <label>&nbsp;</label>
-                    <button onclick="loadData()">🔍 Показать данные</button>
-                </div>
+                <select id="countrySelect">
+                    <option value="">Все страны</option>
+                </select>
+                <select id="indicatorType">
+                    <option value="all">Все показатели</option>
+                    <option value="export">Экспорт</option>
+                    <option value="import">Импорт</option>
+                    <option value="gdp">ВВП</option>
+                </select>
+                <input type="number" id="startYear" placeholder="Год от">
+                <input type="number" id="endYear" placeholder="Год до">
+                <button onclick="loadData()">🔍 Показать данные</button>
             </div>
-
+            
+            <!-- Статистика -->
             <div id="statsContainer" class="stats"></div>
-
+            
+            <!-- Графики -->
             <div class="charts">
                 <div class="chart-container">
                     <h3>📈 Динамика показателей</h3>
                     <canvas id="trendChart"></canvas>
+                    <div id="trendEmptyMessage" style="display:none; text-align:center; padding:50px; color:#999;">
+                        Нет данных для отображения<br>
+                        Загрузите данные через CSV или добавьте вручную
+                    </div>
                 </div>
                 <div class="chart-container">
-                    <h3>🥧 Распределение показателей</h3>
+                    <h3>🥧 Распределение (последний год)</h3>
                     <canvas id="pieChart"></canvas>
+                    <div id="pieEmptyMessage" style="display:none; text-align:center; padding:50px; color:#999;">
+                        Нет данных для отображения
+                    </div>
                 </div>
             </div>
-
-            <div class="data-table">
-                <h3>📋 Детальные данные</h3>
-                <div id="tableContainer"></div>
-            </div>
-
-            <div class="add-data">
-                <h3>➕ Добавить данные</h3>
-                <div class="form-grid">
-                    <input type="text" id="newCountryName" placeholder="Название новой страны">
-                    <button onclick="addCountry()">Добавить страну</button>
-                </div>
-                <div class="form-grid">
-                    <select id="indicatorCountry">
-                        <option value="">Выберите страну</option>
-                    </select>
-                    <input type="number" id="indicatorYear" placeholder="Год">
-                    <input type="number" id="exportValue" placeholder="Экспорт (млрд USD)" step="0.01">
-                    <input type="number" id="importValue" placeholder="Импорт (млрд USD)" step="0.01">
-                    <input type="number" id="gdpValue" placeholder="ВВП (млрд USD)" step="0.01">
-                    <button onclick="addIndicator()">Добавить показатель</button>
-                </div>
-            </div>
-
-<!-- Добавьте эту секцию в конец <div class="content"> перед closing div -->
-
-            <!-- CSV Import Section -->
+            
+            <!-- Импорт CSV -->
             <div class="csv-import-section">
-                <h3>📁 Импорт данных из CSV/Excel</h3>
-                <div class="csv-import-container">
-                    <div class="import-controls">
-                        <input type="file" id="csvFile" accept=".csv,.xlsx" class="file-input">
-                        <button onclick="previewCSV()" class="btn-secondary">👁️ Предпросмотр</button>
-                        <button onclick="downloadTemplate()" class="btn-secondary">📄 Скачать шаблон</button>
-                    </div>
-                    
-                    <div id="previewContainer" style="display: none;">
-                        <div class="preview-header">
-                            <h4>Предпросмотр данных</h4>
-                            <div class="mapping-controls">
-                                <label>Маппинг колонок:</label>
-                                <div id="mappingOptions" class="mapping-options"></div>
-                                <button onclick="importCSV()" class="btn-primary">🚀 Импортировать данные</button>
-                            </div>
-                        </div>
-                        <div id="previewTable" class="preview-table"></div>
-                    </div>
-                    
-                    <div id="importProgress" style="display: none;">
-                        <div class="progress-bar">
-                            <div id="progressFill" class="progress-fill"></div>
-                        </div>
-                        <div id="importResult" class="import-result"></div>
-                    </div>
+                <h3>📁 Импорт данных из CSV</h3>
+                <div class="import-controls">
+                    <input type="file" id="csvFile" accept=".csv">
+                    <button onclick="previewCSV()">👁️ Предпросмотр</button>
+                    <button onclick="downloadTemplate()">📄 Скачать шаблон</button>
                 </div>
+                <div id="previewContainer" style="display:none;"></div>
+                <div id="importResult"></div>
             </div>
-
-
-
         </div>
     </div>
-
+    
     <script>
         let trendChart, pieChart;
-
-        // Загрузка списка стран
+        
         async function loadCountries() {
             const response = await fetch('/api/countries');
             const countries = await response.json();
-            
             const select = document.getElementById('countrySelect');
-            const indicatorSelect = document.getElementById('indicatorCountry');
             
-            countries.forEach(country => {
+            // Очищаем и добавляем опцию по умолчанию
+            select.innerHTML = '<option value="">Все страны</option>';
+            
+            countries.forEach(c => {
                 const option = document.createElement('option');
-                option.value = country.id;
-                option.textContent = country.name;
+                option.value = c.id;
+                option.textContent = c.name;
                 select.appendChild(option);
-                
-                const option2 = document.createElement('option');
-                option2.value = country.id;
-                option2.textContent = country.name;
-                indicatorSelect.appendChild(option2);
             });
-        }
-
-        // Загрузка данных
-        async function loadData() {
-            const countryId = document.getElementById('countrySelect').value;
-            const indicatorType = document.getElementById('indicatorType').value;
-            const startYear = document.getElementById('startYear').value;
-            const endYear = document.getElementById('endYear').value;
             
-            let url = `/api/indicators/filter?indicator_type=${indicatorType}`;
-            if (countryId) url += `&country_id=${countryId}`;
-            if (startYear) url += `&start_year=${startYear}`;
-            if (endYear) url += `&end_year=${endYear}`;
-            
-            const response = await fetch(url);
-            const data = await response.json();
-            
-            displayData(data);
-            
-            if (countryId) {
-                loadStats(countryId);
-            } else {
-                document.getElementById('statsContainer').innerHTML = '';
+            // Если нет стран, показываем сообщение
+            if (countries.length === 0) {
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'info-message';
+                infoDiv.innerHTML = 'ℹ️ Нет добавленных стран. Загрузите данные через CSV или добавьте страны вручную.';
+                document.querySelector('.controls').after(infoDiv);
             }
         }
         
-        // Загрузка статистики
-        async function loadStats(countryId) {
-            const response = await fetch(`/api/stats/${countryId}`);
-            const stats = await response.json();
+        async function loadData() {
+            const params = new URLSearchParams({
+                country_id: document.getElementById('countrySelect').value,
+                indicator_type: document.getElementById('indicatorType').value,
+                start_year: document.getElementById('startYear').value,
+                end_year: document.getElementById('endYear').value
+            });
             
-            const statsHtml = `
-                <div class="stat-card">
-                    <h3>📊 Лет данных</h3>
-                    <div class="value">${stats.years_count || 0}</div>
-                </div>
-                <div class="stat-card">
-                    <h3>📅 Период</h3>
-                    <div class="value">${stats.min_year || '-'} - ${stats.max_year || '-'}</div>
-                </div>
-                <div class="stat-card">
-                    <h3>💰 Средний экспорт</h3>
-                    <div class="value">${stats.avg_export ? stats.avg_export.toFixed(2) : '-'} млрд</div>
-                </div>
-                <div class="stat-card">
-                    <h3>📥 Средний импорт</h3>
-                    <div class="value">${stats.avg_import ? stats.avg_import.toFixed(2) : '-'} млрд</div>
-                </div>
-                <div class="stat-card">
-                    <h3>🏭 Средний ВВП</h3>
-                    <div class="value">${stats.avg_gdp ? stats.avg_gdp.toFixed(2) : '-'} млрд</div>
-                </div>
-            `;
-            document.getElementById('statsContainer').innerHTML = statsHtml;
-        }
-        
-        // Отображение данных
-        function displayData(data) {
+            const response = await fetch(`/api/indicators/filter?${params}`);
+            const data = await response.json();
+            
+            // Скрываем/показываем сообщения о пустых данных
+            const hasData = data && data.length > 0;
+            
+            if (!hasData) {
+                // Показываем сообщения об отсутствии данных
+                document.getElementById('trendEmptyMessage').style.display = 'block';
+                document.getElementById('pieEmptyMessage').style.display = 'block';
+                if (trendChart) trendChart.destroy();
+                if (pieChart) pieChart.destroy();
+                document.getElementById('statsContainer').innerHTML = `
+                    <div class="empty-state" style="grid-column: 1/-1;">
+                        <h3>📭 Нет данных для отображения</h3>
+                        <p>Загрузите данные через CSV файл или добавьте вручную</p>
+                        <button onclick="document.getElementById('csvFile').click()">📁 Загрузить CSV</button>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Скрываем сообщения
+            document.getElementById('trendEmptyMessage').style.display = 'none';
+            document.getElementById('pieEmptyMessage').style.display = 'none';
+            
+            // Обновляем графики
             const years = data.map(d => d.year);
             const exports = data.map(d => d.export_value || 0);
             const imports = data.map(d => d.import_value || 0);
             const gdps = data.map(d => d.gdp_value || 0);
             
-            // Обновление графиков
             if (trendChart) trendChart.destroy();
-            if (pieChart) pieChart.destroy();
-            
-            const ctx = document.getElementById('trendChart').getContext('2d');
-            trendChart = new Chart(ctx, {
+            trendChart = new Chart(document.getElementById('trendChart'), {
                 type: 'line',
                 data: {
                     labels: years,
                     datasets: [
-                        {
-                            label: 'Экспорт (млрд USD)',
-                            data: exports,
-                            borderColor: 'rgb(75, 192, 192)',
-                            backgroundColor: 'rgba(75, 192, 192, 0.1)',
-                            tension: 0.1
-                        },
-                        {
-                            label: 'Импорт (млрд USD)',
-                            data: imports,
-                            borderColor: 'rgb(255, 99, 132)',
-                            backgroundColor: 'rgba(255, 99, 132, 0.1)',
-                            tension: 0.1
-                        },
-                        {
-                            label: 'ВВП (млрд USD)',
-                            data: gdps,
-                            borderColor: 'rgb(54, 162, 235)',
-                            backgroundColor: 'rgba(54, 162, 235, 0.1)',
-                            tension: 0.1
-                        }
+                        { label: 'Экспорт (млрд USD)', data: exports, borderColor: 'rgb(75, 192, 192)', tension: 0.1 },
+                        { label: 'Импорт (млрд USD)', data: imports, borderColor: 'rgb(255, 99, 132)', tension: 0.1 },
+                        { label: 'ВВП (млрд USD)', data: gdps, borderColor: 'rgb(54, 162, 235)', tension: 0.1 }
                     ]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: true,
+                    plugins: { legend: { position: 'top' } }
+                }
+            });
+            
+            if (pieChart) pieChart.destroy();
+            const last = data[data.length-1];
+            pieChart = new Chart(document.getElementById('pieChart'), {
+                type: 'pie',
+                data: {
+                    labels: ['Экспорт', 'Импорт', 'ВВП'],
+                    datasets: [{
+                        data: [last.export_value||0, last.import_value||0, last.gdp_value||0],
+                        backgroundColor: ['rgb(75, 192, 192)', 'rgb(255, 99, 132)', 'rgb(54, 162, 235)']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
                     plugins: {
-                        legend: {
-                            position: 'top',
-                        }
+                        legend: { position: 'top' },
+                        title: { display: true, text: `Показатели за ${last.year} год` }
                     }
                 }
             });
             
-            // Круговая диаграмма для последнего года
-            const lastIndex = data.length - 1;
-            if (lastIndex >= 0) {
-                const lastData = data[lastIndex];
-                const pieCtx = document.getElementById('pieChart').getContext('2d');
-                pieChart = new Chart(pieCtx, {
-                    type: 'pie',
-                    data: {
-                        labels: ['Экспорт', 'Импорт', 'ВВП'],
-                        datasets: [{
-                            data: [
-                                lastData.export_value || 0,
-                                lastData.import_value || 0,
-                                lastData.gdp_value || 0
-                            ],
-                            backgroundColor: [
-                                'rgb(75, 192, 192)',
-                                'rgb(255, 99, 132)',
-                                'rgb(54, 162, 235)'
-                            ]
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: true,
-                        plugins: {
-                            legend: {
-                                position: 'top',
-                            },
-                            title: {
-                                display: true,
-                                text: `Показатели за ${lastData.year} год`
-                            }
-                        }
-                    }
-                });
-            }
-            
-            // Отображение таблицы
-            let tableHtml = '<table><thead><tr><th>Страна</th><th>Год</th><th>Экспорт (млрд USD)</th><th>Импорт (млрд USD)</th><th>ВВП (млрд USD)</th></tr></thead><tbody>';
-            data.forEach(row => {
-                tableHtml += `<tr>
-                    <td>${row.country_name || ''}</td>
-                    <td>${row.year}</td>
-                    <td>${row.export_value ? row.export_value.toFixed(2) : '-'}</td>
-                    <td>${row.import_value ? row.import_value.toFixed(2) : '-'}</td>
-                    <td>${row.gdp_value ? row.gdp_value.toFixed(2) : '-'}</td>
-                </tr>`;
-            });
-            tableHtml += '</tbody></table>';
-            document.getElementById('tableContainer').innerHTML = tableHtml;
-        }
-        
-        // Добавление страны
-        async function addCountry() {
-            const name = document.getElementById('newCountryName').value;
-            if (!name) {
-                alert('Введите название страны');
-                return;
-            }
-            
-            const response = await fetch('/api/add_country', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({name})
-            });
-            
-            if (response.ok) {
-                alert('Страна успешно добавлена');
-                location.reload();
+            // Загружаем статистику если выбрана страна
+            const countryId = document.getElementById('countrySelect').value;
+            if (countryId) {
+                const statsRes = await fetch(`/api/stats/${countryId}`);
+                const stats = await statsRes.json();
+                if (stats && stats.years_count > 0) {
+                    const statsHtml = `
+                        <div class="stat-card"><h3>📊 Лет данных</h3><div class="value">${stats.years_count || 0}</div></div>
+                        <div class="stat-card"><h3>📅 Период</h3><div class="value">${stats.min_year || '-'} - ${stats.max_year || '-'}</div></div>
+                        <div class="stat-card"><h3>💰 Средний экспорт</h3><div class="value">${stats.avg_export ? stats.avg_export.toFixed(2) : '-'} млрд</div></div>
+                        <div class="stat-card"><h3>📥 Средний импорт</h3><div class="value">${stats.avg_import ? stats.avg_import.toFixed(2) : '-'} млрд</div></div>
+                        <div class="stat-card"><h3>🏭 Средний ВВП</h3><div class="value">${stats.avg_gdp ? stats.avg_gdp.toFixed(2) : '-'} млрд</div></div>
+                    `;
+                    document.getElementById('statsContainer').innerHTML = statsHtml;
+                } else {
+                    document.getElementById('statsContainer').innerHTML = `
+                        <div class="empty-state" style="grid-column: 1/-1;">
+                            <h3>📭 Нет статистики для выбранной страны</h3>
+                            <p>Добавьте данные через CSV или форму ниже</p>
+                        </div>
+                    `;
+                }
             } else {
-                const error = await response.json();
-                alert(error.error || 'Ошибка при добавлении страны');
+                document.getElementById('statsContainer').innerHTML = `
+                    <div class="info-message" style="grid-column: 1/-1; text-align:center;">
+                        📊 Выберите страну для просмотра статистики
+                    </div>
+                `;
             }
         }
-        
-        // Добавление показателя
-        async function addIndicator() {
-            const countryId = document.getElementById('indicatorCountry').value;
-            const year = document.getElementById('indicatorYear').value;
-            const exportValue = document.getElementById('exportValue').value;
-            const importValue = document.getElementById('importValue').value;
-            const gdpValue = document.getElementById('gdpValue').value;
-            
-            if (!countryId || !year) {
-                alert('Выберите страну и укажите год');
-                return;
-            }
-            
-            const response = await fetch('/api/add_indicator', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    country_id: parseInt(countryId),
-                    year: parseInt(year),
-                    export_value: exportValue ? parseFloat(exportValue) : null,
-                    import_value: importValue ? parseFloat(importValue) : null,
-                    gdp_value: gdpValue ? parseFloat(gdpValue) : null
-                })
-            });
-            
-            if (response.ok) {
-                alert('Показатель успешно добавлен');
-                document.getElementById('indicatorYear').value = '';
-                document.getElementById('exportValue').value = '';
-                document.getElementById('importValue').value = '';
-                document.getElementById('gdpValue').value = '';
-                loadData();
-            } else {
-                const error = await response.json();
-                alert(error.error || 'Ошибка при добавлении показателя');
-            }
-        }
-        
-        // Инициализация
-        loadCountries();
-
-        // CSV Import Functions
-        let currentFile = null;
-        let currentMapping = null;
-        let currentPreviewData = null;
         
         async function previewCSV() {
-            const fileInput = document.getElementById('csvFile');
-            const file = fileInput.files[0];
-            
+            const file = document.getElementById('csvFile').files[0];
             if (!file) {
-                alert('Пожалуйста, выберите файл');
+                alert('Выберите файл');
                 return;
             }
-            
-            currentFile = file;
             
             const formData = new FormData();
             formData.append('file', file);
+            const response = await fetch('/api/csv/preview', { method: 'POST', body: formData });
+            const result = await response.json();
             
-            try {
-                const response = await fetch('/api/csv/preview', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const result = await response.json();
-                
-                if (response.ok) {
-                    displayPreview(result);
-                } else {
-                    alert('Ошибка: ' + result.error);
-                }
-            } catch (error) {
-                alert('Ошибка при предпросмотре: ' + error.message);
-            }
-        }
-        
-        function displayPreview(data) {
-            currentPreviewData = data;
+            const previewDiv = document.getElementById('previewContainer');
             
-            // Показываем контейнер предпросмотра
-            const previewContainer = document.getElementById('previewContainer');
-            previewContainer.style.display = 'block';
-            
-            // Создаем маппинг опций
-            const mappingOptions = document.getElementById('mappingOptions');
-            mappingOptions.innerHTML = '';
-            
-            const dataTypes = ['country', 'year', 'export', 'import', 'gdp'];
-            const dataTypeNames = {
-                'country': '🌍 Страна',
-                'year': '📅 Год',
-                'export': '📤 Экспорт',
-                'import': '📥 Импорт',
-                'gdp': '💰 ВВП'
-            };
-            
-            dataTypes.forEach(dataType => {
-                const div = document.createElement('div');
-                div.className = 'mapping-item';
-                div.innerHTML = `
-                    <label>${dataTypeNames[dataType]}:</label>
-                    <select id="mapping_${dataType}">
-                        <option value="">-- Не выбрано --</option>
-                        ${data.columns.map(col => `<option value="${col}" ${data.detected_mapping[dataType] === col ? 'selected' : ''}>${col}</option>`).join('')}
-                    </select>
+            if (result.success) {
+                previewDiv.style.display = 'block';
+                previewDiv.innerHTML = `
+                    <div style="background: #e8f5e9; padding: 15px; border-radius: 8px; margin-top: 15px;">
+                        <h4>📋 Предпросмотр данных</h4>
+                        <p><strong>Найдено колонок:</strong> ${result.columns.length}</p>
+                        <p><strong>Определено соответствие:</strong></p>
+                        <ul>
+                            ${Object.entries(result.detected_mapping).map(([k,v]) => `<li>${k}: ${v || 'не найдено'}</li>`).join('')}
+                        </ul>
+                        <p><strong>Первые 3 строки:</strong></p>
+                        <pre style="background: white; padding: 10px; overflow-x: auto;">${JSON.stringify(result.preview, null, 2)}</pre>
+                        <button onclick="importCSV()" style="margin-top: 10px;">🚀 Начать импорт</button>
+                        <button onclick="document.getElementById('previewContainer').style.display='none'" style="margin-top: 10px; margin-left: 10px;">❌ Отмена</button>
+                    </div>
                 `;
-                mappingOptions.appendChild(div);
-            });
-            
-            // Отображаем предпросмотр данных
-            const previewTable = document.getElementById('previewTable');
-            let tableHtml = '<table><thead><tr>';
-            data.columns.forEach(col => {
-                tableHtml += `<th>${col}</th>`;
-            });
-            tableHtml += '</tr></thead><tbody>';
-            
-            data.preview.forEach(row => {
-                tableHtml += '<tr>';
-                data.columns.forEach(col => {
-                    tableHtml += `<td>${row[col] !== null ? row[col] : '-'}</td>`;
-                });
-                tableHtml += '</tr>';
-            });
-            tableHtml += '</tbody></table>';
-            
-            previewTable.innerHTML = tableHtml;
+            } else {
+                previewDiv.style.display = 'block';
+                previewDiv.innerHTML = `
+                    <div style="background: #ffebee; padding: 15px; border-radius: 8px; margin-top: 15px; color: #c62828;">
+                        <strong>❌ Ошибка:</strong> ${result.error}
+                    </div>
+                `;
+            }
         }
         
         async function importCSV() {
-            if (!currentFile) {
-                alert('Пожалуйста, сначала выберите файл и выполните предпросмотр');
-                return;
-            }
-            
-            // Собираем пользовательский маппинг
-            const customMapping = {};
-            const dataTypes = ['country', 'year', 'export', 'import', 'gdp'];
-            
-            dataTypes.forEach(dataType => {
-                const select = document.getElementById(`mapping_${dataType}`);
-                if (select && select.value) {
-                    customMapping[dataType] = select.value;
-                }
-            });
-            
-            // Показываем прогресс
-            const progressDiv = document.getElementById('importProgress');
-            progressDiv.style.display = 'block';
-            
+            const file = document.getElementById('csvFile').files[0];
             const formData = new FormData();
-            formData.append('file', currentFile);
-            if (Object.keys(customMapping).length > 0) {
-                formData.append('mapping', JSON.stringify(customMapping));
-            }
+            formData.append('file', file);
             
-            try {
-                const response = await fetch('/api/csv/import', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const result = await response.json();
-                
-                if (response.ok) {
-                    displayImportResult(result);
-                    // Перезагружаем данные
-                    setTimeout(() => {
-                        loadData();
-                        loadCountries();
-                    }, 1000);
-                } else {
-                    displayImportResult({ success: false, errors: [result.error] });
-                }
-            } catch (error) {
-                displayImportResult({ success: false, errors: [error.message] });
-            }
-        }
-        
-        function displayImportResult(result) {
-            const progressFill = document.getElementById('progressFill');
-            const importResult = document.getElementById('importResult');
+            const response = await fetch('/api/csv/import', { method: 'POST', body: formData });
+            const result = await response.json();
             
+            const resultDiv = document.getElementById('importResult');
             if (result.success) {
-                progressFill.style.width = '100%';
-                progressFill.textContent = '100%';
-                
-                let statsHtml = `
-                    <div class="stats-summary">
-                        <div class="stat-item">
-                            <div class="label">Всего строк</div>
-                            <div class="value">${result.total_rows}</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="label">Импортировано</div>
-                            <div class="value">${result.imported_rows}</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="label">Пропущено</div>
-                            <div class="value">${result.skipped_rows}</div>
-                        </div>
+                resultDiv.innerHTML = `
+                    <div style="background: #d4edda; padding: 15px; border-radius: 8px; margin-top: 15px; color: #155724;">
+                        <strong>✅ Импорт завершен!</strong><br>
+                        📊 Всего строк: ${result.total_rows}<br>
+                        💾 Импортировано: ${result.imported_rows}<br>
+                        ⏭️ Пропущено: ${result.skipped_rows || 0}
+                        ${result.errors && result.errors.length ? `<br>⚠️ Ошибок: ${result.errors.length}` : ''}
                     </div>
                 `;
-                
-                if (result.warnings && result.warnings.length > 0) {
-                    statsHtml += '<div class="warning-details"><strong>⚠️ Предупреждения:</strong><ul>';
-                    result.warnings.forEach(warning => {
-                        statsHtml += `<li>${warning}</li>`;
-                    });
-                    statsHtml += '</ul></div>';
-                }
-                
-                importResult.innerHTML = statsHtml;
-                importResult.className = 'import-result success';
+                // Перезагружаем данные
+                setTimeout(() => {
+                    loadCountries();
+                    loadData();
+                    document.getElementById('previewContainer').style.display = 'none';
+                }, 2000);
             } else {
-                progressFill.style.width = '0%';
-                let errorsHtml = '<div class="error-details"><strong>❌ Ошибки:</strong><ul>';
-                result.errors.forEach(error => {
-                    errorsHtml += `<li>${error}</li>`;
-                });
-                errorsHtml += '</ul></div>';
-                
-                importResult.innerHTML = errorsHtml;
-                importResult.className = 'import-result error';
+                resultDiv.innerHTML = `
+                    <div style="background: #f8d7da; padding: 15px; border-radius: 8px; margin-top: 15px; color: #721c24;">
+                        <strong>❌ Ошибка импорта:</strong><br>
+                        ${result.errors.join('<br>')}
+                    </div>
+                `;
             }
         }
         
         async function downloadTemplate() {
-            try {
-                const response = await fetch('/api/csv/template');
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'import_template.csv';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(url);
-            } catch (error) {
-                alert('Ошибка при скачивании шаблона: ' + error.message);
-            }
+            window.location.href = '/api/csv/template';
         }
         
-        async function loadMappingOptions() {
-            try {
-                const response = await fetch('/api/csv/mapping-options');
-                const data = await response.json();
-                console.log('Mapping options loaded:', data);
-            } catch (error) {
-                console.error('Error loading mapping options:', error);
-            }
-        }
-        
-        // Загружаем опции маппинга при старте
-        loadMappingOptions();
-
+        // Инициализация
+        loadCountries();
+        loadData();
     </script>
 </body>
 </html>
