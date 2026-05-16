@@ -1,7 +1,13 @@
 from flask import Blueprint, request, jsonify
 from services.indicator_service import IndicatorService
+from flask import Blueprint, request, jsonify, send_file
+from services.csv_import_service import CSVImportService
+import io
+import json
 
 indicators_bp = Blueprint('indicators', __name__)
+
+
 
 
 @indicators_bp.route('/api/indicators/<int:country_id>', methods=['GET'])
@@ -79,3 +85,181 @@ def delete_indicator(indicator_id):
     if success:
         return jsonify({'message': message})
     return jsonify({'error': message}), 404
+
+
+# @indicators_bp.route('/api/csv/preview', methods=['POST'])
+# def preview_csv():
+#     """
+#     Предпросмотр CSV файла
+#     """
+#     if 'file' not in request.files:
+#         return jsonify({'error': 'Файл не загружен'}), 400
+    
+#     file = request.files['file']
+#     if file.filename == '':
+#         return jsonify({'error': 'Файл не выбран'}), 400
+    
+#     if not (file.filename.endswith('.csv') or file.filename.endswith('.xlsx')):
+#         return jsonify({'error': 'Поддерживаются только CSV и Excel файлы'}), 400
+    
+#     try:
+#         file_content = file.read()
+#         preview_result = CSVImportService.preview_csv(file_content, file.filename)
+        
+#         if preview_result['success']:
+#             return jsonify(preview_result)
+#         else:
+#             return jsonify({'error': preview_result['error']}), 400
+            
+#     except Exception as e:
+#         return jsonify({'error': f'Ошибка при обработке файла: {str(e)}'}), 500
+
+
+# @indicators_bp.route('/api/csv/import', methods=['POST'])
+# def import_csv():
+#     """
+#     Импорт CSV файла в базу данных
+#     """
+#     if 'file' not in request.files:
+#         return jsonify({'error': 'Файл не загружен'}), 400
+    
+#     file = request.files['file']
+#     if file.filename == '':
+#         return jsonify({'error': 'Файл не выбран'}), 400
+    
+#     if not (file.filename.endswith('.csv') or file.filename.endswith('.xlsx')):
+#         return jsonify({'error': 'Поддерживаются только CSV и Excel файлы'}), 400
+    
+#     # Получаем пользовательский маппинг если есть
+#     custom_mapping = request.form.get('mapping')
+#     if custom_mapping:
+#         import json
+#         custom_mapping = json.loads(custom_mapping)
+    
+#     try:
+#         file_content = file.read()
+#         import_result = CSVImportService.import_csv(
+#             file_content, 
+#             file.filename, 
+#             custom_mapping
+#         )
+        
+#         return jsonify(import_result)
+        
+#     except Exception as e:
+#         return jsonify({'error': f'Ошибка при импорте: {str(e)}'}), 500
+
+
+# @indicators_bp.route('/api/csv/template', methods=['GET'])
+# def download_template():
+#     """
+#     Скачивание шаблона CSV файла
+#     """
+#     template_content = CSVImportService.generate_template()
+    
+#     return send_file(
+#         io.BytesIO(template_content),
+#         mimetype='text/csv',
+#         as_attachment=True,
+#         download_name='import_template.csv'
+#     )
+
+
+# @indicators_bp.route('/api/csv/mapping-options', methods=['GET'])
+# def get_mapping_options():
+#     """
+#     Получение вариантов маппинга колонок
+#     """
+#     return jsonify({
+#         'available_mappings': list(CSVImportService.COLUMN_MAPPING.keys()),
+#         'column_keywords': CSVImportService.COLUMN_MAPPING
+#     })
+
+
+# ... существующие маршруты ...
+
+
+@indicators_bp.route('/api/csv/preview', methods=['POST'])
+def preview_csv():
+    """Предпросмотр CSV файла"""
+    if 'file' not in request.files:
+        return jsonify({'error': 'Файл не загружен'}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'Файл не выбран'}), 400
+    
+    if not (file.filename.endswith('.csv') or file.filename.endswith('.xlsx')):
+        return jsonify({'error': 'Поддерживаются только CSV и Excel файлы'}), 400
+    
+    try:
+        file_content = file.read()
+        preview_result = CSVImportService.preview_csv(file_content, file.filename)
+        
+        if preview_result['success']:
+            return jsonify(preview_result)
+        else:
+            return jsonify({'error': preview_result['error']}), 400
+            
+    except Exception as e:
+        return jsonify({'error': f'Ошибка при обработке файла: {str(e)}'}), 500
+
+
+@indicators_bp.route('/api/csv/import', methods=['POST'])
+def import_csv():
+    """Импорт CSV файла в базу данных"""
+    if 'file' not in request.files:
+        return jsonify({'error': 'Файл не загружен'}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'Файл не выбран'}), 400
+    
+    if not (file.filename.endswith('.csv') or file.filename.endswith('.xlsx')):
+        return jsonify({'error': 'Поддерживаются только CSV и Excel файлы'}), 400
+    
+    # Получаем пользовательский маппинг если есть
+    custom_mapping = request.form.get('mapping')
+    if custom_mapping:
+        try:
+            custom_mapping = json.loads(custom_mapping)
+        except:
+            pass
+    
+    try:
+        file_content = file.read()
+        import_result = CSVImportService.import_csv(
+            file_content, 
+            file.filename, 
+            custom_mapping
+        )
+        
+        return jsonify(import_result)
+        
+    except Exception as e:
+        return jsonify({'error': f'Ошибка при импорте: {str(e)}'}), 500
+
+
+@indicators_bp.route('/api/csv/template', methods=['GET'])
+def download_template():
+    """Скачивание шаблона CSV файла"""
+    try:
+        template_content = CSVImportService.generate_template()
+        
+        return send_file(
+            io.BytesIO(template_content),
+            mimetype='text/csv',
+            as_attachment=True,
+            download_name='import_template.csv'
+        )
+    except Exception as e:
+        return jsonify({'error': f'Ошибка при создании шаблона: {str(e)}'}), 500
+
+
+@indicators_bp.route('/api/csv/mapping-options', methods=['GET'])
+def get_mapping_options():
+    """Получение вариантов маппинга колонок"""
+    return jsonify({
+        'available_mappings': list(CSVImportService.COLUMN_MAPPING.keys()),
+        'column_keywords': CSVImportService.COLUMN_MAPPING
+    })

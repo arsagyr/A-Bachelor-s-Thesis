@@ -80,6 +80,62 @@ def with_db_connection(f):
     return decorated
 
 
+# def init_database():
+#     """Инициализация базы данных"""
+#     conn = Database.get_connection()
+#     cur = conn.cursor()
+    
+#     try:
+#         # Создание таблиц
+#         cur.execute("""
+#             CREATE TABLE IF NOT EXISTS countries (
+#                 id SERIAL PRIMARY KEY,
+#                 name VARCHAR(100) NOT NULL UNIQUE,
+#                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+#             )
+#         """)
+        
+#         cur.execute("""
+#             CREATE TABLE IF NOT EXISTS indicators (
+#                 id SERIAL PRIMARY KEY,
+#                 country_id INTEGER NOT NULL REFERENCES countries(id) ON DELETE CASCADE,
+#                 year INTEGER NOT NULL,
+#                 export_value DECIMAL(15, 2),
+#                 import_value DECIMAL(15, 2),
+#                 gdp_value DECIMAL(15, 2),
+#                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+#                 UNIQUE(country_id, year)
+#             )
+#         """)
+        
+#         # Создание индексов для оптимизации
+#         cur.execute("CREATE INDEX IF NOT EXISTS idx_indicators_country_year ON indicators(country_id, year)")
+#         cur.execute("CREATE INDEX IF NOT EXISTS idx_indicators_year ON indicators(year)")
+#         cur.execute("CREATE INDEX IF NOT EXISTS idx_countries_name ON countries(name)")
+        
+#         conn.commit()
+#         print("✅ Database initialized successfully")
+        
+#         # Проверка наличия тестовых данных
+#         cur.execute("SELECT COUNT(*) FROM countries")
+#         count = cur.fetchone()['count']
+        
+#         if count == 0:
+#             # Добавление тестовых данных
+#             test_countries = ['Россия', 'США', 'Китай', 'Германия', 'Япония']
+#             for country in test_countries:
+#                 cur.execute("INSERT INTO countries (name) VALUES (%s) ON CONFLICT (name) DO NOTHING", (country,))
+            
+#             conn.commit()
+#             print("✅ Test countries added")
+            
+#     except Exception as e:
+#         print(f"❌ Database initialization error: {e}")
+#         conn.rollback()
+#     finally:
+#         cur.close()
+#         Database.return_connection(conn)
+
 def init_database():
     """Инициализация базы данных"""
     conn = Database.get_connection()
@@ -103,10 +159,18 @@ def init_database():
                 export_value DECIMAL(15, 2),
                 import_value DECIMAL(15, 2),
                 gdp_value DECIMAL(15, 2),
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(country_id, year)
             )
         """)
+        
+        # Добавляем колонку updated_at если её нет
+        try:
+            cur.execute("""
+                ALTER TABLE indicators 
+                ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            """)
+        except Exception as e:
+            print(f"Note: {e}")
         
         # Создание индексов для оптимизации
         cur.execute("CREATE INDEX IF NOT EXISTS idx_indicators_country_year ON indicators(country_id, year)")

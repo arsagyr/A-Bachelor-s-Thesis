@@ -151,48 +151,90 @@ class IndicatorService:
         
         return None
     
-    @staticmethod
-    @with_db_connection
-    def add_or_update_indicator(conn, 
-                               country_id: int, 
-                               year: int,
-                               export_value: Optional[float] = None,
-                               import_value: Optional[float] = None,
-                               gdp_value: Optional[float] = None) -> Tuple[bool, str]:
-        """Добавление или обновление показателя"""
-        # Валидация
-        is_valid, error = Validators.validate_indicator_data(
-            country_id, year, export_value, import_value, gdp_value
-        )
-        if not is_valid:
-            return False, error
+    # @staticmethod
+    # @with_db_connection
+    # def add_or_update_indicator(conn, 
+    #                            country_id: int, 
+    #                            year: int,
+    #                            export_value: Optional[float] = None,
+    #                            import_value: Optional[float] = None,
+    #                            gdp_value: Optional[float] = None) -> Tuple[bool, str]:
+    #     """Добавление или обновление показателя"""
+    #     # Валидация
+    #     is_valid, error = Validators.validate_indicator_data(
+    #         country_id, year, export_value, import_value, gdp_value
+    #     )
+    #     if not is_valid:
+    #         return False, error
         
-        cur = conn.cursor()
-        try:
-            # Проверка существования страны
-            cur.execute("SELECT id FROM countries WHERE id = %s", (country_id,))
-            if not cur.fetchone():
-                return False, "Страна не найдена"
+    #     cur = conn.cursor()
+    #     try:
+    #         # Проверка существования страны
+    #         cur.execute("SELECT id FROM countries WHERE id = %s", (country_id,))
+    #         if not cur.fetchone():
+    #             return False, "Страна не найдена"
             
-            cur.execute("""
-                INSERT INTO indicators (country_id, year, export_value, import_value, gdp_value, updated_at)
-                VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
-                ON CONFLICT (country_id, year) DO UPDATE SET
-                    export_value = EXCLUDED.export_value,
-                    import_value = EXCLUDED.import_value,
-                    gdp_value = EXCLUDED.gdp_value,
-                    updated_at = CURRENT_TIMESTAMP
-                RETURNING id
-            """, (country_id, year, export_value, import_value, gdp_value))
+    #         cur.execute("""
+    #             INSERT INTO indicators (country_id, year, export_value, import_value, gdp_value, updated_at)
+    #             VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+    #             ON CONFLICT (country_id, year) DO UPDATE SET
+    #                 export_value = EXCLUDED.export_value,
+    #                 import_value = EXCLUDED.import_value,
+    #                 gdp_value = EXCLUDED.gdp_value,
+    #                 updated_at = CURRENT_TIMESTAMP
+    #             RETURNING id
+    #         """, (country_id, year, export_value, import_value, gdp_value))
             
-            conn.commit()
-            return True, "Показатель успешно сохранен"
-        except Exception as e:
-            conn.rollback()
-            return False, f"Ошибка при сохранении: {str(e)}"
-        finally:
-            cur.close()
+    #         conn.commit()
+    #         return True, "Показатель успешно сохранен"
+    #     except Exception as e:
+    #         conn.rollback()
+    #         return False, f"Ошибка при сохранении: {str(e)}"
+    #     finally:
+    #         cur.close()
     
+@staticmethod
+@with_db_connection
+def add_or_update_indicator(conn, 
+                           country_id: int, 
+                           year: int,
+                           export_value: Optional[float] = None,
+                           import_value: Optional[float] = None,
+                           gdp_value: Optional[float] = None) -> Tuple[bool, str]:
+    """Добавление или обновление показателя"""
+    # Валидация
+    is_valid, error = Validators.validate_indicator_data(
+        country_id, year, export_value, import_value, gdp_value
+    )
+    if not is_valid:
+        return False, error
+    
+    cur = conn.cursor()
+    try:
+        # Проверка существования страны
+        cur.execute("SELECT id FROM countries WHERE id = %s", (country_id,))
+        if not cur.fetchone():
+            return False, "Страна не найдена"
+        
+        # Обновляем без updated_at
+        cur.execute("""
+            INSERT INTO indicators (country_id, year, export_value, import_value, gdp_value)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (country_id, year) DO UPDATE SET
+                export_value = EXCLUDED.export_value,
+                import_value = EXCLUDED.import_value,
+                gdp_value = EXCLUDED.gdp_value
+        """, (country_id, year, export_value, import_value, gdp_value))
+        
+        conn.commit()
+        return True, "Показатель успешно сохранен"
+    except Exception as e:
+        conn.rollback()
+        return False, f"Ошибка при сохранении: {str(e)}"
+    finally:
+        cur.close()
+
+
     @staticmethod
     @with_db_connection
     def get_available_years(conn) -> List[int]:

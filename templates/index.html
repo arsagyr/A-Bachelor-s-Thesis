@@ -186,6 +186,197 @@
                 grid-template-columns: 1fr;
             }
         }
+        /* CSV Import Styles */
+        .csv-import-section {
+            margin-top: 40px;
+            padding: 25px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 15px;
+        }
+        
+        .csv-import-section h3 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+        
+        .import-controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .file-input {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            background: white;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-secondary:hover {
+            background: #5a6268;
+            transform: translateY(-2px);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        
+        .preview-header {
+            margin-bottom: 20px;
+        }
+        
+        .mapping-controls {
+            margin: 15px 0;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+        }
+        
+        .mapping-options {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin: 15px 0;
+        }
+        
+        .mapping-item {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .mapping-item label {
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #666;
+        }
+        
+        .mapping-item select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        
+        .preview-table {
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .preview-table table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+        
+        .preview-table th {
+            background: #667eea;
+            color: white;
+            padding: 10px;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        .preview-table td {
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #e0e0e0;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #28a745, #20c997);
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        
+        .import-result {
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+        
+        .import-result.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .import-result.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .import-result.warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+        
+        .stats-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-item {
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .stat-item .label {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .stat-item .value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+
+
     </style>
 </head>
 <body>
@@ -261,6 +452,42 @@
                     <button onclick="addIndicator()">Добавить показатель</button>
                 </div>
             </div>
+
+<!-- Добавьте эту секцию в конец <div class="content"> перед closing div -->
+
+            <!-- CSV Import Section -->
+            <div class="csv-import-section">
+                <h3>📁 Импорт данных из CSV/Excel</h3>
+                <div class="csv-import-container">
+                    <div class="import-controls">
+                        <input type="file" id="csvFile" accept=".csv,.xlsx" class="file-input">
+                        <button onclick="previewCSV()" class="btn-secondary">👁️ Предпросмотр</button>
+                        <button onclick="downloadTemplate()" class="btn-secondary">📄 Скачать шаблон</button>
+                    </div>
+                    
+                    <div id="previewContainer" style="display: none;">
+                        <div class="preview-header">
+                            <h4>Предпросмотр данных</h4>
+                            <div class="mapping-controls">
+                                <label>Маппинг колонок:</label>
+                                <div id="mappingOptions" class="mapping-options"></div>
+                                <button onclick="importCSV()" class="btn-primary">🚀 Импортировать данные</button>
+                            </div>
+                        </div>
+                        <div id="previewTable" class="preview-table"></div>
+                    </div>
+                    
+                    <div id="importProgress" style="display: none;">
+                        <div class="progress-bar">
+                            <div id="progressFill" class="progress-fill"></div>
+                        </div>
+                        <div id="importResult" class="import-result"></div>
+                    </div>
+                </div>
+            </div>
+
+
+
         </div>
     </div>
 
@@ -509,6 +736,225 @@
         
         // Инициализация
         loadCountries();
+
+        // CSV Import Functions
+        let currentFile = null;
+        let currentMapping = null;
+        let currentPreviewData = null;
+        
+        async function previewCSV() {
+            const fileInput = document.getElementById('csvFile');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Пожалуйста, выберите файл');
+                return;
+            }
+            
+            currentFile = file;
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                const response = await fetch('/api/csv/preview', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    displayPreview(result);
+                } else {
+                    alert('Ошибка: ' + result.error);
+                }
+            } catch (error) {
+                alert('Ошибка при предпросмотре: ' + error.message);
+            }
+        }
+        
+        function displayPreview(data) {
+            currentPreviewData = data;
+            
+            // Показываем контейнер предпросмотра
+            const previewContainer = document.getElementById('previewContainer');
+            previewContainer.style.display = 'block';
+            
+            // Создаем маппинг опций
+            const mappingOptions = document.getElementById('mappingOptions');
+            mappingOptions.innerHTML = '';
+            
+            const dataTypes = ['country', 'year', 'export', 'import', 'gdp'];
+            const dataTypeNames = {
+                'country': '🌍 Страна',
+                'year': '📅 Год',
+                'export': '📤 Экспорт',
+                'import': '📥 Импорт',
+                'gdp': '💰 ВВП'
+            };
+            
+            dataTypes.forEach(dataType => {
+                const div = document.createElement('div');
+                div.className = 'mapping-item';
+                div.innerHTML = `
+                    <label>${dataTypeNames[dataType]}:</label>
+                    <select id="mapping_${dataType}">
+                        <option value="">-- Не выбрано --</option>
+                        ${data.columns.map(col => `<option value="${col}" ${data.detected_mapping[dataType] === col ? 'selected' : ''}>${col}</option>`).join('')}
+                    </select>
+                `;
+                mappingOptions.appendChild(div);
+            });
+            
+            // Отображаем предпросмотр данных
+            const previewTable = document.getElementById('previewTable');
+            let tableHtml = '<table><thead><tr>';
+            data.columns.forEach(col => {
+                tableHtml += `<th>${col}</th>`;
+            });
+            tableHtml += '</tr></thead><tbody>';
+            
+            data.preview.forEach(row => {
+                tableHtml += '<tr>';
+                data.columns.forEach(col => {
+                    tableHtml += `<td>${row[col] !== null ? row[col] : '-'}</td>`;
+                });
+                tableHtml += '</tr>';
+            });
+            tableHtml += '</tbody></table>';
+            
+            previewTable.innerHTML = tableHtml;
+        }
+        
+        async function importCSV() {
+            if (!currentFile) {
+                alert('Пожалуйста, сначала выберите файл и выполните предпросмотр');
+                return;
+            }
+            
+            // Собираем пользовательский маппинг
+            const customMapping = {};
+            const dataTypes = ['country', 'year', 'export', 'import', 'gdp'];
+            
+            dataTypes.forEach(dataType => {
+                const select = document.getElementById(`mapping_${dataType}`);
+                if (select && select.value) {
+                    customMapping[dataType] = select.value;
+                }
+            });
+            
+            // Показываем прогресс
+            const progressDiv = document.getElementById('importProgress');
+            progressDiv.style.display = 'block';
+            
+            const formData = new FormData();
+            formData.append('file', currentFile);
+            if (Object.keys(customMapping).length > 0) {
+                formData.append('mapping', JSON.stringify(customMapping));
+            }
+            
+            try {
+                const response = await fetch('/api/csv/import', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    displayImportResult(result);
+                    // Перезагружаем данные
+                    setTimeout(() => {
+                        loadData();
+                        loadCountries();
+                    }, 1000);
+                } else {
+                    displayImportResult({ success: false, errors: [result.error] });
+                }
+            } catch (error) {
+                displayImportResult({ success: false, errors: [error.message] });
+            }
+        }
+        
+        function displayImportResult(result) {
+            const progressFill = document.getElementById('progressFill');
+            const importResult = document.getElementById('importResult');
+            
+            if (result.success) {
+                progressFill.style.width = '100%';
+                progressFill.textContent = '100%';
+                
+                let statsHtml = `
+                    <div class="stats-summary">
+                        <div class="stat-item">
+                            <div class="label">Всего строк</div>
+                            <div class="value">${result.total_rows}</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="label">Импортировано</div>
+                            <div class="value">${result.imported_rows}</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="label">Пропущено</div>
+                            <div class="value">${result.skipped_rows}</div>
+                        </div>
+                    </div>
+                `;
+                
+                if (result.warnings && result.warnings.length > 0) {
+                    statsHtml += '<div class="warning-details"><strong>⚠️ Предупреждения:</strong><ul>';
+                    result.warnings.forEach(warning => {
+                        statsHtml += `<li>${warning}</li>`;
+                    });
+                    statsHtml += '</ul></div>';
+                }
+                
+                importResult.innerHTML = statsHtml;
+                importResult.className = 'import-result success';
+            } else {
+                progressFill.style.width = '0%';
+                let errorsHtml = '<div class="error-details"><strong>❌ Ошибки:</strong><ul>';
+                result.errors.forEach(error => {
+                    errorsHtml += `<li>${error}</li>`;
+                });
+                errorsHtml += '</ul></div>';
+                
+                importResult.innerHTML = errorsHtml;
+                importResult.className = 'import-result error';
+            }
+        }
+        
+        async function downloadTemplate() {
+            try {
+                const response = await fetch('/api/csv/template');
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'import_template.csv';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            } catch (error) {
+                alert('Ошибка при скачивании шаблона: ' + error.message);
+            }
+        }
+        
+        async function loadMappingOptions() {
+            try {
+                const response = await fetch('/api/csv/mapping-options');
+                const data = await response.json();
+                console.log('Mapping options loaded:', data);
+            } catch (error) {
+                console.error('Error loading mapping options:', error);
+            }
+        }
+        
+        // Загружаем опции маппинга при старте
+        loadMappingOptions();
+
     </script>
 </body>
 </html>
