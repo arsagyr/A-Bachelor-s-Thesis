@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Экономические показатели стран</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f7f7f7;
+            border-radius: 10px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .control-group label {
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #333;
+        }
+
+        select, input, button {
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            cursor: pointer;
+            font-weight: 600;
+            border: none;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-card h3 {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 10px;
+        }
+
+        .stat-card .value {
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .charts {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .chart-container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .chart-container h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .data-table {
+            overflow-x: auto;
+            margin-top: 30px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background: #f7f7f7;
+        }
+
+        .add-data {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f7f7f7;
+            border-radius: 10px;
+        }
+
+        .add-data h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        @media (max-width: 768px) {
+            .charts {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Экономические показатели стран</h1>
+            <p>Визуализация экспорта, импорта и ВВП</p>
+        </div>
+
+        <div class="content">
+            <div class="controls">
+                <div class="control-group">
+                    <label>🌍 Выберите страну</label>
+                    <select id="countrySelect">
+                        <option value="">Все страны</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>📈 Тип показателя</label>
+                    <select id="indicatorType">
+                        <option value="all">Все показатели</option>
+                        <option value="export">Экспорт</option>
+                        <option value="import">Импорт</option>
+                        <option value="gdp">ВВП</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>📅 Год от</label>
+                    <input type="number" id="startYear" placeholder="Начальный год">
+                </div>
+                <div class="control-group">
+                    <label>📅 Год до</label>
+                    <input type="number" id="endYear" placeholder="Конечный год">
+                </div>
+                <div class="control-group">
+                    <label>&nbsp;</label>
+                    <button onclick="loadData()">🔍 Показать данные</button>
+                </div>
+            </div>
+
+            <div id="statsContainer" class="stats"></div>
+
+            <div class="charts">
+                <div class="chart-container">
+                    <h3>📈 Динамика показателей</h3>
+                    <canvas id="trendChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h3>🥧 Распределение показателей</h3>
+                    <canvas id="pieChart"></canvas>
+                </div>
+            </div>
+
+            <div class="data-table">
+                <h3>📋 Детальные данные</h3>
+                <div id="tableContainer"></div>
+            </div>
+
+            <div class="add-data">
+                <h3>➕ Добавить данные</h3>
+                <div class="form-grid">
+                    <input type="text" id="newCountryName" placeholder="Название новой страны">
+                    <button onclick="addCountry()">Добавить страну</button>
+                </div>
+                <div class="form-grid">
+                    <select id="indicatorCountry">
+                        <option value="">Выберите страну</option>
+                    </select>
+                    <input type="number" id="indicatorYear" placeholder="Год">
+                    <input type="number" id="exportValue" placeholder="Экспорт (млрд USD)" step="0.01">
+                    <input type="number" id="importValue" placeholder="Импорт (млрд USD)" step="0.01">
+                    <input type="number" id="gdpValue" placeholder="ВВП (млрд USD)" step="0.01">
+                    <button onclick="addIndicator()">Добавить показатель</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let trendChart, pieChart;
+
+        // Загрузка списка стран
+        async function loadCountries() {
+            const response = await fetch('/api/countries');
+            const countries = await response.json();
+            
+            const select = document.getElementById('countrySelect');
+            const indicatorSelect = document.getElementById('indicatorCountry');
+            
+            countries.forEach(country => {
+                const option = document.createElement('option');
+                option.value = country.id;
+                option.textContent = country.name;
+                select.appendChild(option);
+                
+                const option2 = document.createElement('option');
+                option2.value = country.id;
+                option2.textContent = country.name;
+                indicatorSelect.appendChild(option2);
+            });
+        }
+
+        // Загрузка данных
+        async function loadData() {
+            const countryId = document.getElementById('countrySelect').value;
+            const indicatorType = document.getElementById('indicatorType').value;
+            const startYear = document.getElementById('startYear').value;
+            const endYear = document.getElementById('endYear').value;
+            
+            let url = `/api/indicators/filter?indicator_type=${indicatorType}`;
+            if (countryId) url += `&country_id=${countryId}`;
+            if (startYear) url += `&start_year=${startYear}`;
+            if (endYear) url += `&end_year=${endYear}`;
+            
+            const response = await fetch(url);
+            const data = await response.json();
+            
+            displayData(data);
+            
+            if (countryId) {
+                loadStats(countryId);
+            } else {
+                document.getElementById('statsContainer').innerHTML = '';
+            }
+        }
+        
+        // Загрузка статистики
+        async function loadStats(countryId) {
+            const response = await fetch(`/api/stats/${countryId}`);
+            const stats = await response.json();
+            
+            const statsHtml = `
+                <div class="stat-card">
+                    <h3>📊 Лет данных</h3>
+                    <div class="value">${stats.years_count || 0}</div>
+                </div>
+                <div class="stat-card">
+                    <h3>📅 Период</h3>
+                    <div class="value">${stats.min_year || '-'} - ${stats.max_year || '-'}</div>
+                </div>
+                <div class="stat-card">
+                    <h3>💰 Средний экспорт</h3>
+                    <div class="value">${stats.avg_export ? stats.avg_export.toFixed(2) : '-'} млрд</div>
+                </div>
+                <div class="stat-card">
+                    <h3>📥 Средний импорт</h3>
+                    <div class="value">${stats.avg_import ? stats.avg_import.toFixed(2) : '-'} млрд</div>
+                </div>
+                <div class="stat-card">
+                    <h3>🏭 Средний ВВП</h3>
+                    <div class="value">${stats.avg_gdp ? stats.avg_gdp.toFixed(2) : '-'} млрд</div>
+                </div>
+            `;
+            document.getElementById('statsContainer').innerHTML = statsHtml;
+        }
+        
+        // Отображение данных
+        function displayData(data) {
+            const years = data.map(d => d.year);
+            const exports = data.map(d => d.export_value || 0);
+            const imports = data.map(d => d.import_value || 0);
+            const gdps = data.map(d => d.gdp_value || 0);
+            
+            // Обновление графиков
+            if (trendChart) trendChart.destroy();
+            if (pieChart) pieChart.destroy();
+            
+            const ctx = document.getElementById('trendChart').getContext('2d');
+            trendChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: years,
+                    datasets: [
+                        {
+                            label: 'Экспорт (млрд USD)',
+                            data: exports,
+                            borderColor: 'rgb(75, 192, 192)',
+                            backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                            tension: 0.1
+                        },
+                        {
+                            label: 'Импорт (млрд USD)',
+                            data: imports,
+                            borderColor: 'rgb(255, 99, 132)',
+                            backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                            tension: 0.1
+                        },
+                        {
+                            label: 'ВВП (млрд USD)',
+                            data: gdps,
+                            borderColor: 'rgb(54, 162, 235)',
+                            backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                            tension: 0.1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    }
+                }
+            });
+            
+            // Круговая диаграмма для последнего года
+            const lastIndex = data.length - 1;
+            if (lastIndex >= 0) {
+                const lastData = data[lastIndex];
+                const pieCtx = document.getElementById('pieChart').getContext('2d');
+                pieChart = new Chart(pieCtx, {
+                    type: 'pie',
+                    data: {
+                        labels: ['Экспорт', 'Импорт', 'ВВП'],
+                        datasets: [{
+                            data: [
+                                lastData.export_value || 0,
+                                lastData.import_value || 0,
+                                lastData.gdp_value || 0
+                            ],
+                            backgroundColor: [
+                                'rgb(75, 192, 192)',
+                                'rgb(255, 99, 132)',
+                                'rgb(54, 162, 235)'
+                            ]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            },
+                            title: {
+                                display: true,
+                                text: `Показатели за ${lastData.year} год`
+                            }
+                        }
+                    }
+                });
+            }
+            
+            // Отображение таблицы
+            let tableHtml = '<table><thead><tr><th>Страна</th><th>Год</th><th>Экспорт (млрд USD)</th><th>Импорт (млрд USD)</th><th>ВВП (млрд USD)</th></tr></thead><tbody>';
+            data.forEach(row => {
+                tableHtml += `<tr>
+                    <td>${row.country_name || ''}</td>
+                    <td>${row.year}</td>
+                    <td>${row.export_value ? row.export_value.toFixed(2) : '-'}</td>
+                    <td>${row.import_value ? row.import_value.toFixed(2) : '-'}</td>
+                    <td>${row.gdp_value ? row.gdp_value.toFixed(2) : '-'}</td>
+                </tr>`;
+            });
+            tableHtml += '</tbody></table>';
+            document.getElementById('tableContainer').innerHTML = tableHtml;
+        }
+        
+        // Добавление страны
+        async function addCountry() {
+            const name = document.getElementById('newCountryName').value;
+            if (!name) {
+                alert('Введите название страны');
+                return;
+            }
+            
+            const response = await fetch('/api/add_country', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({name})
+            });
+            
+            if (response.ok) {
+                alert('Страна успешно добавлена');
+                location.reload();
+            } else {
+                const error = await response.json();
+                alert(error.error || 'Ошибка при добавлении страны');
+            }
+        }
+        
+        // Добавление показателя
+        async function addIndicator() {
+            const countryId = document.getElementById('indicatorCountry').value;
+            const year = document.getElementById('indicatorYear').value;
+            const exportValue = document.getElementById('exportValue').value;
+            const importValue = document.getElementById('importValue').value;
+            const gdpValue = document.getElementById('gdpValue').value;
+            
+            if (!countryId || !year) {
+                alert('Выберите страну и укажите год');
+                return;
+            }
+            
+            const response = await fetch('/api/add_indicator', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    country_id: parseInt(countryId),
+                    year: parseInt(year),
+                    export_value: exportValue ? parseFloat(exportValue) : null,
+                    import_value: importValue ? parseFloat(importValue) : null,
+                    gdp_value: gdpValue ? parseFloat(gdpValue) : null
+                })
+            });
+            
+            if (response.ok) {
+                alert('Показатель успешно добавлен');
+                document.getElementById('indicatorYear').value = '';
+                document.getElementById('exportValue').value = '';
+                document.getElementById('importValue').value = '';
+                document.getElementById('gdpValue').value = '';
+                loadData();
+            } else {
+                const error = await response.json();
+                alert(error.error || 'Ошибка при добавлении показателя');
+            }
+        }
+        
+        // Инициализация
+        loadCountries();
+    </script>
+</body>
+</html>
