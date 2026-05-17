@@ -80,7 +80,7 @@ async function loadData() {
                     <div class="stat-card"><h3>📅 Период</h3><div class="value">${stats.min_year} - ${stats.max_year}</div></div>
                     <div class="stat-card"><h3>💰 Средний экспорт</h3><div class="value">${stats.avg_export ? stats.avg_export.toFixed(2) : '-'} млрд</div></div>
                     <div class="stat-card"><h3>📥 Средний импорт</h3><div class="value">${stats.avg_import ? stats.avg_import.toFixed(2) : '-'} млрд</div></div>
-                    <div class="stat-card"><h3>🏭 Средний ВВП</h3><div class="value">${stats.avg_gdp ? stats.avg_gdp.toFixed(2) : '-'} млрд</div></div>
+                    <div class="stat-card"><h3>🏭 Средний ВВП</h3><div class="value">${stats.avg_gdp ? stats.avg_gdp.toFixed(2) : '-'} трлн</div></div>
                 `;
             }
         }
@@ -180,8 +180,8 @@ function displayGDPForecast(forecast) {
     const metricsHtml = `
         <div class="metric-card"><h4>📊 Модель</h4><div class="value">${forecast.model_type}</div></div>
         <div class="metric-card"><h4>📈 R² Score</h4><div class="value">${forecast.metrics.r2.toFixed(4)}</div></div>
-        <div class="metric-card"><h4>📉 RMSE</h4><div class="value">${forecast.metrics.rmse.toFixed(2)} млрд</div></div>
-        <div class="metric-card"><h4>🎯 MAE</h4><div class="value">${forecast.metrics.mae.toFixed(2)} млрд</div></div>
+        <div class="metric-card"><h4>📉 RMSE</h4><div class="value">${forecast.metrics.rmse.toFixed(2)} трлн</div></div>
+        <div class="metric-card"><h4>🎯 MAE</h4><div class="value">${forecast.metrics.mae.toFixed(2)} трлн</div></div>
     `;
     document.getElementById('gdpForecastMetrics').innerHTML = metricsHtml;
     
@@ -245,13 +245,13 @@ function displayGDPForecast(forecast) {
                     callbacks: {
                         label: function(context) {
                             return context.dataset.label + ': ' + 
-                                   new Intl.NumberFormat('ru-RU').format(context.parsed.y) + ' млрд USD';
+                                   new Intl.NumberFormat('ru-RU').format(context.parsed.y) + 'трлн USD';
                         }
                     }
                 }
             },
             scales: {
-                y: { beginAtZero: true, title: { display: true, text: 'млрд USD' } },
+                y: { beginAtZero: true, title: { display: true, text: 'трлн USD' } },
                 x: { title: { display: true, text: 'Год' } }
             }
         }
@@ -379,4 +379,173 @@ document.getElementById('countrySelect').addEventListener('change', function() {
 document.addEventListener('DOMContentLoaded', () => {
     loadCountries();
     loadData();
+});
+
+// Загрузка списка показателей для удаления
+async function loadIndicatorsForDelete() {
+    const countryId = document.getElementById('countrySelect').value;
+    if (!countryId) {
+        document.getElementById('deleteIndicatorSelect').innerHTML = '<option value="">Сначала выберите страну</option>';
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/indicators/filter?country_id=${countryId}`);
+        const data = await response.json();
+        
+        const select = document.getElementById('deleteIndicatorSelect');
+        select.innerHTML = '<option value="">Выберите показатель</option>';
+        
+        data.forEach(item => {
+            const option = document.createElement('option');
+            option.value = item.id;
+            option.textContent = `${item.year} - Экспорт: ${item.export_value || 0}, Импорт: ${item.import_value || 0}, ВВП: ${item.gdp_value || 0}`;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
+// Загрузка списка стран для удаления показателей
+async function loadCountriesForDelete() {
+    try {
+        const response = await fetch('/api/countries');
+        const countries = await response.json();
+        
+        const select1 = document.getElementById('deleteCountryIndicatorsSelect');
+        const select2 = document.getElementById('deleteCountrySelect');
+        
+        select1.innerHTML = '<option value="">Выберите страну</option>';
+        select2.innerHTML = '<option value="">Выберите страну</option>';
+        
+        countries.forEach(c => {
+            const option1 = document.createElement('option');
+            option1.value = c.id;
+            option1.textContent = c.name;
+            select1.appendChild(option1);
+            
+            const option2 = document.createElement('option');
+            option2.value = c.id;
+            option2.textContent = c.name;
+            select2.appendChild(option2);
+        });
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
+// Удаление выбранного показателя
+async function deleteSelectedIndicator() {
+    const indicatorId = document.getElementById('deleteIndicatorSelect').value;
+    if (!indicatorId) {
+        alert('Выберите показатель для удаления');
+        return;
+    }
+    
+    if (!confirm('Вы уверены, что хотите удалить этот показатель?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/indicators/${indicatorId}`, { method: 'DELETE' });
+        const result = await response.json();
+        
+        if (response.ok) {
+            alert(result.message);
+            loadData();
+            loadIndicatorsForDelete();
+        } else {
+            alert('Ошибка: ' + result.error);
+        }
+    } catch (error) {
+        alert('Ошибка: ' + error.message);
+    }
+}
+
+// Удаление всех показателей страны
+async function deleteCountryIndicators() {
+    const countryId = document.getElementById('deleteCountryIndicatorsSelect').value;
+    if (!countryId) {
+        alert('Выберите страну');
+        return;
+    }
+    
+    const countryName = document.getElementById('deleteCountryIndicatorsSelect').options[
+        document.getElementById('deleteCountryIndicatorsSelect').selectedIndex
+    ].text;
+    
+    if (!confirm(`Вы уверены, что хотите удалить ВСЕ показатели страны "${countryName}"?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/indicators/country/${countryId}`, { method: 'DELETE' });
+        const result = await response.json();
+        
+        if (response.ok) {
+            alert(result.message);
+            loadData();
+            loadIndicatorsForDelete();
+        } else {
+            alert('Ошибка: ' + result.error);
+        }
+    } catch (error) {
+        alert('Ошибка: ' + error.message);
+    }
+}
+
+// Удаление страны
+async function deleteCountry() {
+    const countryId = document.getElementById('deleteCountrySelect').value;
+    if (!countryId) {
+        alert('Выберите страну');
+        return;
+    }
+    
+    const countryName = document.getElementById('deleteCountrySelect').options[
+        document.getElementById('deleteCountrySelect').selectedIndex
+    ].text;
+    
+    if (!confirm(`ВНИМАНИЕ! Вы уверены, что хотите удалить страну "${countryName}" вместе со ВСЕМИ показателями? Это действие необратимо!`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/countries/${countryId}`, { method: 'DELETE' });
+        const result = await response.json();
+        
+        if (response.ok) {
+            alert(result.message);
+            loadCountries();
+            loadData();
+            loadCountriesForDelete();
+            document.getElementById('deleteIndicatorSelect').innerHTML = '<option value="">Выберите показатель</option>';
+        } else {
+            alert('Ошибка: ' + result.error);
+        }
+    } catch (error) {
+        alert('Ошибка: ' + error.message);
+    }
+}
+
+// Обновите обработчик события выбора страны
+document.getElementById('countrySelect').addEventListener('change', function() {
+    const show = this.value ? 'block' : 'none';
+    document.getElementById('forecastSection').style.display = show;
+    document.getElementById('gdpForecastSection').style.display = show;
+    
+    // Загружаем показатели для удаления
+    if (this.value) {
+        loadIndicatorsForDelete();
+    } else {
+        document.getElementById('deleteIndicatorSelect').innerHTML = '<option value="">Выберите показатель</option>';
+    }
+});
+
+// Загрузка стран для удаления при загрузке страницы
+document.addEventListener('DOMContentLoaded', () => {
+    loadCountries();
+    loadData();
+    loadCountriesForDelete();
 });

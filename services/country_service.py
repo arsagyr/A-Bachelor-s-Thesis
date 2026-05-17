@@ -38,3 +38,21 @@ class CountryService:
             return None, f"Ошибка: {str(e)}"
         finally:
             cur.close()
+    
+    @staticmethod
+    @with_db_connection
+    def delete_country(conn, country_id: int) -> Tuple[bool, str]:
+        """Удаление страны (каскадно удалятся все показатели)"""
+        cur = conn.cursor()
+        try:
+            cur.execute("DELETE FROM countries WHERE id = %s RETURNING id", (country_id,))
+            deleted = cur.fetchone()
+            conn.commit()
+            if deleted:
+                return True, "Страна успешно удалена"
+            return False, "Страна не найдена"
+        except Exception as e:
+            conn.rollback()
+            return False, f"Ошибка при удалении: {str(e)}"
+        finally:
+            cur.close()

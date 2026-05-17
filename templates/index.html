@@ -148,6 +148,39 @@
                 <div id="importResult"></div>
             </div>
         </div>
+
+        <!-- Добавьте эту секцию после импорта CSV и перед закрывающим div content -->
+
+        <!-- Управление данными -->
+        <div class="data-management-section">
+            <h3>🗑️ Управление данными</h3>
+            <div class="management-controls">
+                <div class="control-group">
+                    <label>📊 Удалить показатель</label>
+                    <select id="deleteIndicatorSelect">
+                        <option value="">Выберите показатель</option>
+                    </select>
+                    <button onclick="deleteSelectedIndicator()" class="btn-danger" style="margin-top: 5px;">🗑️ Удалить показатель</button>
+                </div>
+                
+                <div class="control-group">
+                    <label>🏢 Удалить все показатели страны</label>
+                    <select id="deleteCountryIndicatorsSelect">
+                        <option value="">Выберите страну</option>
+                    </select>
+                    <button onclick="deleteCountryIndicators()" class="btn-warning" style="margin-top: 5px;">⚠️ Удалить показатели страны</button>
+                </div>
+                
+                <div class="control-group">
+                    <label>🗑️ Удалить страну (все данные)</label>
+                            <select id="deleteCountrySelect">
+                                <option value="">Выберите страну</option>
+                            </select>
+                            <button onclick="deleteCountry()" class="btn-danger" style="margin-top: 5px;">🔥 Удалить страну</button>
+                </div>
+            </div>
+        </div>
+
     </div>
     
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>

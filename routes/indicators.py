@@ -3,6 +3,7 @@ from services.indicator_service import IndicatorService
 from services.csv_import_service import CSVImportService
 from services.forecast_service import ForecastService
 from services.regression_service import RegressionService
+from services.country_service import CountryService
 import pandas as pd
 import io
 import json
@@ -184,4 +185,44 @@ def forecast_gdp_from_trade(country_id):
         print(f"Error: {e}")
         import traceback
         traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+    
+
+    # Добавьте эти эндпоинты в конец файла routes/indicators.py
+
+# ==================== УДАЛЕНИЕ ДАННЫХ ====================
+
+@indicators_bp.route('/api/indicators/<int:indicator_id>', methods=['DELETE'])
+def delete_indicator(indicator_id):
+    """Удаление показателя по ID"""
+    try:
+        success, message = IndicatorService.delete_indicator(indicator_id)
+        if success:
+            return jsonify({'message': message})
+        return jsonify({'error': message}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@indicators_bp.route('/api/indicators/country/<int:country_id>', methods=['DELETE'])
+def delete_country_indicators(country_id):
+    """Удаление всех показателей страны"""
+    try:
+        success, message = IndicatorService.delete_indicators_by_country(country_id)
+        if success:
+            return jsonify({'message': message})
+        return jsonify({'error': message}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@indicators_bp.route('/api/countries/<int:country_id>', methods=['DELETE'])
+def delete_country(country_id):
+    """Удаление страны (вместе со всеми показателями)"""
+    try:
+        success, message = CountryService.delete_country(country_id)
+        if success:
+            return jsonify({'message': message})
+        return jsonify({'error': message}), 404
+    except Exception as e:
         return jsonify({'error': str(e)}), 500

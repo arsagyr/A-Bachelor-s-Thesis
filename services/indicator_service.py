@@ -12,7 +12,7 @@ class IndicatorService:
                          end_year: Optional[int] = None,
                          indicator_type: str = 'all') -> List[Dict[str, Any]]:
         query = """
-            SELECT i.year, i.export_value, i.import_value, i.gdp_value, c.name as country_name
+            SELECT i.id, i.year, i.export_value, i.import_value, i.gdp_value, c.name as country_name, c.id as country_id
             FROM indicators i
             JOIN countries c ON i.country_id = c.id
             WHERE 1=1
@@ -41,19 +41,14 @@ class IndicatorService:
         result = []
         for row in data:
             item = {
+                'id': row['id'],
+                'country_id': row['country_id'],
                 'country_name': row['country_name'],
                 'year': row['year'],
                 'export_value': float(row['export_value']) if row['export_value'] else None,
                 'import_value': float(row['import_value']) if row['import_value'] else None,
                 'gdp_value': float(row['gdp_value']) if row['gdp_value'] else None
             }
-            if indicator_type != 'all':
-                if indicator_type == 'export':
-                    item['import_value'] = item['gdp_value'] = None
-                elif indicator_type == 'import':
-                    item['export_value'] = item['gdp_value'] = None
-                elif indicator_type == 'gdp':
-                    item['export_value'] = item['import_value'] = None
             result.append(item)
         
         return result
@@ -109,5 +104,39 @@ class IndicatorService:
         except Exception as e:
             conn.rollback()
             return False, str(e)
+        finally:
+            cur.close()
+    
+    @staticmethod
+    @with_db_connection
+    def delete_indicator(conn, indicator_id: int) -> Tuple[bool, str]:
+        """Удаление показателя по ID"""
+        cur = conn.cursor()
+        try:
+            cur.execute("DELETE FROM indicators WHERE id = %s RETURNING id", (indicator_id,))
+            deleted = cur.fetchone()
+            conn.commit()
+            if deleted:
+                return True, "Показатель успешно удален"
+            return False, "Показатель не найден"
+        except Exception as e:
+            conn.rollback()
+            return False, f"Ошибка при удалении: {str(e)}"
+        finally:
+            cur.close()
+    
+    @staticmethod
+    @with_db_connection
+    def delete_indicators_by_country(conn, country_id: int) -> Tuple[bool, str]:
+        """Удаление всех показателей страны"""
+        cur = conn.cursor()
+        try:
+            cur.execute("DELETE FROM indicators WHERE country_id = %s RETURNING id", (country_id,))
+            deleted_count = cur.rowcount
+            conn.commit()
+            return True, f"Удалено {deleted_count} показателей"
+        except Exception as e:
+            conn.rollback()
+            return False, f"Ошибка при удалении: {str(e)}"
         finally:
             cur.close()
