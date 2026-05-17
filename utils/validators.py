@@ -18,9 +18,3 @@ class Validators:
         if year < 1900 or year > 2100:
             return False, "Год должен быть между 1900 и 2100"
         return True, None
-    
-    @staticmethod
-    def validate_country_id(country_id: int) -> Tuple[bool, Optional[str]]:
-        if not country_id or country_id <= 0:
-            return False, "Некорректный ID страны"
-        return True, None

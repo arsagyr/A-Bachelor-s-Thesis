@@ -1,4 +1,3 @@
-/* ==================== RESET & BASE STYLES ==================== */
 * {
     margin: 0;
     padding: 0;
@@ -21,7 +20,6 @@ body {
     overflow: hidden;
 }
 
-/* ==================== HEADER ==================== */
 .header {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
@@ -34,12 +32,10 @@ body {
     margin-bottom: 10px;
 }
 
-/* ==================== CONTENT ==================== */
 .content {
     padding: 30px;
 }
 
-/* ==================== CONTROLS ==================== */
 .controls {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -88,13 +84,6 @@ button:hover {
     box-shadow: 0 5px 15px rgba(0,0,0,0.2);
 }
 
-button:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    transform: none;
-}
-
-/* ==================== STATISTICS CARDS ==================== */
 .stats {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -108,11 +97,6 @@ button:disabled {
     padding: 20px;
     border-radius: 10px;
     text-align: center;
-    transition: transform 0.3s;
-}
-
-.stat-card:hover {
-    transform: translateY(-5px);
 }
 
 .stat-card h3 {
@@ -126,7 +110,6 @@ button:disabled {
     font-weight: bold;
 }
 
-/* ==================== CHARTS ==================== */
 .chart-container {
     background: white;
     padding: 20px;
@@ -138,14 +121,84 @@ button:disabled {
 .chart-container h3 {
     margin-bottom: 20px;
     color: #333;
-    font-size: 18px;
 }
 
-canvas {
-    max-height: 500px;
+.forecast-section, .regression-section {
+    margin-top: 40px;
+    padding: 25px;
+    background: #f5f7fa;
+    border-radius: 15px;
 }
 
-/* ==================== EMPTY STATE ==================== */
+.forecast-controls, .regression-controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+    padding: 20px;
+    background: white;
+    border-radius: 10px;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+}
+
+.btn-secondary {
+    background: #6c757d;
+}
+
+.metric-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 15px;
+    border-radius: 10px;
+    text-align: center;
+}
+
+.metric-card h4 {
+    font-size: 12px;
+    opacity: 0.9;
+    margin-bottom: 5px;
+}
+
+.metric-card .value {
+    font-size: 20px;
+    font-weight: bold;
+}
+
+.forecast-metrics, .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.forecast-table {
+    overflow-x: auto;
+    margin-top: 20px;
+}
+
+.forecast-table table, .data-table table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.forecast-table th, .data-table th {
+    background: #667eea;
+    color: white;
+    padding: 12px;
+}
+
+.forecast-table td, .data-table td {
+    padding: 10px;
+    text-align: center;
+    border-bottom: 1px solid #e0e0e0;
+}
+
 .empty-state {
     text-align: center;
     padding: 60px 20px;
@@ -154,33 +207,11 @@ canvas {
     margin: 20px 0;
 }
 
-.empty-state h3 {
-    color: #666;
-    margin-bottom: 15px;
-}
-
-.empty-state p {
-    color: #999;
-    margin-bottom: 20px;
-}
-
-.empty-state button {
-    background: #667eea;
-    padding: 12px 24px;
-    font-size: 16px;
-}
-
-/* ==================== CSV IMPORT SECTION ==================== */
 .csv-import-section {
     margin-top: 40px;
     padding: 25px;
     background: #f5f7fa;
     border-radius: 15px;
-}
-
-.csv-import-section h3 {
-    margin-bottom: 20px;
-    color: #333;
 }
 
 .import-controls {
@@ -198,38 +229,6 @@ canvas {
     background: white;
 }
 
-/* ==================== BUTTONS ==================== */
-.btn-secondary {
-    background: #6c757d;
-    color: white;
-    padding: 10px 20px;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.3s;
-}
-
-.btn-secondary:hover {
-    background: #5a6268;
-    transform: translateY(-2px);
-}
-
-.btn-primary {
-    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-    color: white;
-    padding: 10px 20px;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.3s;
-}
-
-.btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-}
-
-/* ==================== MESSAGES ==================== */
 .preview-container {
     background: white;
     padding: 15px;
@@ -253,147 +252,30 @@ canvas {
     color: #721c24;
 }
 
-.info-message {
-    background: #e3f2fd;
-    border-left: 4px solid #2196f3;
-    padding: 15px;
-    margin: 20px 0;
-    border-radius: 8px;
+@media (max-width: 768px) {
+    .stats, .controls, .forecast-controls, .regression-controls {
+        grid-template-columns: 1fr;
+    }
+    .forecast-metrics, .metrics-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
-/* ==================== FORECAST SECTION ==================== */
-.forecast-section {
-    margin-top: 40px;
-    padding: 25px;
-    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-    border-radius: 15px;
-}
+/* Добавьте в конец файла */
 
-.forecast-section h3 {
-    margin-bottom: 20px;
-    color: #333;
-}
-
-.forecast-controls {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 15px;
-    margin-bottom: 20px;
-    padding: 20px;
-    background: white;
-    border-radius: 10px;
-}
-
-.forecast-chart-container {
-    background: white;
-    padding: 20px;
-    border-radius: 10px;
-    margin: 20px 0;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-}
-
-.forecast-metrics {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 15px;
-    margin: 20px 0;
-}
-
-.metric-card {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 15px;
-    border-radius: 10px;
-    text-align: center;
-}
-
-.metric-card h4 {
-    font-size: 12px;
-    opacity: 0.9;
-    margin-bottom: 5px;
-}
-
-.metric-card .value {
-    font-size: 20px;
-    font-weight: bold;
-}
-
-.forecast-info {
-    background: #e8f4f8;
-    padding: 15px;
-    border-radius: 10px;
-    margin: 15px 0;
-    font-size: 14px;
-    border-left: 4px solid #2196f3;
-}
-
-.model-description {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-
-.model-badge {
-    background: #2196f3;
-    color: white;
-    padding: 5px 10px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: bold;
-}
-
-.models-compare {
-    background: #f5f5f5;
-    padding: 10px;
-    border-radius: 5px;
-    margin-top: 10px;
-    font-size: 13px;
-}
-
-.forecast-table {
-    overflow-x: auto;
-    margin-top: 20px;
-}
-
-.forecast-table table {
-    width: 100%;
-    background: white;
-    border-radius: 10px;
-    overflow: hidden;
-}
-
-.forecast-table th {
-    background: #667eea;
-    color: white;
-    padding: 12px;
-}
-
-.forecast-table td {
-    padding: 10px;
-    text-align: center;
-    border-bottom: 1px solid #e0e0e0;
-}
-
-.confidence-interval {
-    font-size: 12px;
-    color: #666;
-}
-
-/* ==================== REGRESSION SECTION ==================== */
-.regression-section {
+.gdp-forecast-section {
     margin-top: 40px;
     padding: 25px;
     background: linear-gradient(135deg, #fff5e6 0%, #ffe6cc 100%);
     border-radius: 15px;
 }
 
-.regression-section h3 {
+.gdp-forecast-section h3 {
     margin-bottom: 20px;
     color: #333;
 }
 
-.regression-controls {
+.gdp-forecast-controls {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 15px;
@@ -403,119 +285,7 @@ canvas {
     border-radius: 10px;
 }
 
-.metrics-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 15px;
-    margin: 15px 0;
-}
-
-.metric-item {
-    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-    color: white;
-    padding: 15px;
-    border-radius: 10px;
-    text-align: center;
-}
-
-.metric-item .label {
+.confidence-interval {
     font-size: 12px;
-    opacity: 0.9;
-    margin-bottom: 5px;
-}
-
-.metric-item .value {
-    font-size: 24px;
-    font-weight: bold;
-}
-
-.regression-coefficients {
-    background: #f8f9fa;
-    padding: 15px;
-    border-radius: 10px;
-    margin: 15px 0;
-}
-
-.coefficient-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 10px;
-    margin-top: 10px;
-}
-
-.coefficient-item {
-    background: white;
-    padding: 10px;
-    border-radius: 5px;
-    border-left: 3px solid #667eea;
-}
-
-.regression-visualization {
-    margin: 20px 0;
-    background: white;
-    padding: 20px;
-    border-radius: 10px;
-}
-
-.regression-predictor {
-    background: #f0f4f8;
-    padding: 20px;
-    border-radius: 10px;
-    margin-top: 20px;
-}
-
-.predictor-controls {
-    display: flex;
-    gap: 15px;
-    margin: 15px 0;
-    flex-wrap: wrap;
-}
-
-.predictor-controls input {
-    flex: 1;
-    padding: 10px;
-    border: 2px solid #ddd;
-    border-radius: 8px;
-}
-
-.prediction-result {
-    margin-top: 15px;
-    padding: 15px;
-    background: white;
-    border-radius: 8px;
-    text-align: center;
-    font-size: 18px;
-    font-weight: bold;
-    color: #667eea;
-}
-
-/* ==================== RESPONSIVE ==================== */
-@media (max-width: 768px) {
-    .stats {
-        grid-template-columns: 1fr;
-    }
-    
-    .controls {
-        grid-template-columns: 1fr;
-    }
-    
-    .forecast-controls {
-        grid-template-columns: 1fr;
-    }
-    
-    .forecast-metrics {
-        grid-template-columns: 1fr;
-    }
-    
-    .regression-controls {
-        grid-template-columns: 1fr;
-    }
-    
-    .metrics-grid {
-        grid-template-columns: 1fr;
-    }
-    
-    .predictor-controls {
-        flex-direction: column;
-    }
+    color: #666;
 }

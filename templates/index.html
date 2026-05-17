@@ -11,7 +11,7 @@
     <div class="container">
         <div class="header">
             <h1>📊 Экономические показатели стран</h1>
-            <p>Визуализация экспорта, импорта и ВВП</p>
+            <p>Визуализация и прогнозирование экспорта, импорта и ВВП</p>
         </div>
         
         <div class="content">
@@ -63,9 +63,9 @@
                 </div>
             </div>
             
-            <!-- Прогнозирование -->
+            <!-- Прогнозирование временных рядов -->
             <div class="forecast-section" id="forecastSection" style="display:none;">
-                <h3>📈 Прогнозирование экономических показателей</h3>
+                <h3>📈 Прогнозирование временных рядов</h3>
                 <div class="forecast-controls">
                     <div class="control-group">
                         <label>📊 Показатель для прогноза</label>
@@ -73,16 +73,6 @@
                             <option value="export">Экспорт</option>
                             <option value="import">Импорт</option>
                             <option value="gdp">ВВП</option>
-                        </select>
-                    </div>
-                    <div class="control-group">
-                        <label>🤖 Модель прогнозирования</label>
-                        <select id="forecastModel">
-                            <option value="auto">🤖 Автоматический выбор (рекомендуется)</option>
-                            <option value="arima">📊 ARIMA (Авторегрессия)</option>
-                            <option value="holt_winters">📈 Хольта-Винтерса</option>
-                            <option value="linear">📉 Линейная регрессия</option>
-                            <option value="exponential">✨ Экспоненциальное сглаживание</option>
                         </select>
                     </div>
                     <div class="control-group">
@@ -101,60 +91,48 @@
                 </div>
                 
                 <div id="forecastResult" style="display:none;">
+                    <div id="forecastMetrics" class="forecast-metrics"></div>
                     <div class="forecast-chart-container">
                         <canvas id="forecastChart"></canvas>
                     </div>
-                    <div id="forecastMetrics" class="forecast-metrics"></div>
-                    <div id="forecastInfo" class="forecast-info"></div>
                     <div id="forecastTable" class="forecast-table"></div>
                 </div>
             </div>
             
-            <!-- Регрессионный анализ -->
-            <div class="regression-section" id="regressionSection" style="display:none;">
-                <h3>📊 Регрессионный анализ: Зависимость ВВП от экспорта и импорта</h3>
-                
-                <div class="regression-controls">
+            <!-- Прогнозирование ВВП на основе экспорта и импорта -->
+            <div class="gdp-forecast-section" id="gdpForecastSection" style="display:none;">
+                <h3>📊 Прогнозирование ВВП на основе экспорта и импорта</h3>
+                <div class="gdp-forecast-controls">
                     <div class="control-group">
-                        <label>📈 Тип регрессии</label>
-                        <select id="regressionModel">
-                            <option value="linear">📉 Линейная регрессия</option>
-                            <option value="ridge">🎯 Ridge регрессия (L2)</option>
-                            <option value="lasso">⚡ Lasso регрессия (L1)</option>
-                            <option value="polynomial">📈 Полиномиальная регрессия</option>
+                        <label>📈 Модель регрессии</label>
+                        <select id="gdpRegressionModel">
+                            <option value="linear">Линейная регрессия</option>
+                            <option value="ridge">Ridge регрессия</option>
+                            <option value="lasso">Lasso регрессия</option>
+                            <option value="polynomial">Полиномиальная</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>🔮 Горизонт прогноза</label>
+                        <select id="gdpForecastSteps">
+                            <option value="3">3 года</option>
+                            <option value="5" selected>5 лет</option>
+                            <option value="7">7 лет</option>
+                            <option value="10">10 лет</option>
                         </select>
                     </div>
                     <div class="control-group">
                         <label>&nbsp;</label>
-                        <button onclick="runRegressionAnalysis()" class="btn-primary">🔬 Провести анализ</button>
+                        <button onclick="loadGDPForecast()" class="btn-primary" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);">📊 Прогноз ВВП</button>
                     </div>
                 </div>
                 
-                <div id="regressionResult" style="display:none;">
-                    <div class="regression-metrics">
-                        <h4>📊 Метрики качества модели</h4>
-                        <div id="regressionMetrics" class="metrics-grid"></div>
+                <div id="gdpForecastResult" style="display:none;">
+                    <div id="gdpForecastMetrics" class="forecast-metrics"></div>
+                    <div class="forecast-chart-container">
+                        <canvas id="gdpForecastChart"></canvas>
                     </div>
-                    
-                    <div class="regression-coefficients">
-                        <h4>📐 Коэффициенты модели</h4>
-                        <div id="regressionCoefficients"></div>
-                    </div>
-                    
-                    <div class="regression-visualization">
-                        <h4>📈 Визуализация зависимости</h4>
-                        <canvas id="regressionChart"></canvas>
-                    </div>
-                    
-                    <div class="regression-predictor">
-                        <h4>🔮 Прогнозирование ВВП</h4>
-                        <div class="predictor-controls">
-                            <input type="number" id="predictExport" placeholder="Экспорт (млрд USD)">
-                            <input type="number" id="predictImport" placeholder="Импорт (млрд USD)">
-                            <button onclick="predictGDP()" class="btn-secondary">💡 Предсказать ВВП</button>
-                        </div>
-                        <div id="predictionResult" class="prediction-result"></div>
-                    </div>
+                    <div id="gdpForecastTable" class="forecast-table"></div>
                 </div>
             </div>
             

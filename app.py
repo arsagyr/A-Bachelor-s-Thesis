@@ -8,7 +8,6 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
     
-    # Регистрация статических файлов
     app.static_folder = 'static'
     app.static_url_path = '/static'
     

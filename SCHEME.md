@@ -14,8 +14,7 @@ economic_dashboard/
 ├── routes/
 │   ├── __init__.py
 │   ├── countries.py
-│   ├── indicators.py
-│   └── main.py
+│   └── indicators.py
 ├── services/
 │   ├── __init__.py
 │   ├── country_service.py

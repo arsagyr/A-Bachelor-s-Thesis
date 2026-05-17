@@ -48,9 +48,11 @@ class CSVImportService:
     def import_csv(cls, file_content: bytes, filename: str, 
                    custom_mapping: Dict[str, str] = None) -> Dict[str, Any]:
         results = {'success': True, 'total_rows': 0, 'imported_rows': 0, 'errors': []}
-        conn = Database.get_connection()
+        conn = None
+        cur = None
         
         try:
+            conn = Database.get_connection()
             df = pd.read_csv(io.BytesIO(file_content), encoding='utf-8')
             results['total_rows'] = len(df)
             
@@ -60,18 +62,22 @@ class CSVImportService:
                 try:
                     country_name = str(row[mapping['country']]).strip()
                     
-                    # Получаем или создаем страну
                     cur = conn.cursor()
                     cur.execute("SELECT id FROM countries WHERE name = %s", (country_name,))
                     country = cur.fetchone()
+                    cur.close()
+                    cur = None
                     
                     if country:
                         country_id = country['id']
                     else:
+                        cur = conn.cursor()
                         cur.execute("INSERT INTO countries (name) VALUES (%s) RETURNING id", (country_name,))
                         country_id = cur.fetchone()['id']
+                        cur.close()
+                        cur = None
                     
-                    # Сохраняем показатель
+                    cur = conn.cursor()
                     cur.execute("""
                         INSERT INTO indicators (country_id, year, export_value, import_value, gdp_value)
                         VALUES (%s, %s, %s, %s, %s)
@@ -87,8 +93,9 @@ class CSVImportService:
                         float(row[mapping['gdp']]) if mapping.get('gdp') and pd.notna(row[mapping['gdp']]) else None
                     ))
                     cur.close()
-                    results['imported_rows'] += 1
+                    cur = None
                     conn.commit()
+                    results['imported_rows'] += 1
                     
                 except Exception as e:
                     results['errors'].append(f"Строка {idx + 1}: {str(e)}")
@@ -98,7 +105,10 @@ class CSVImportService:
             results['success'] = False
             results['errors'].append(str(e))
         finally:
-            Database.return_connection(conn)
+            if cur:
+                cur.close()
+            if conn:
+                Database.return_connection(conn)
         
         return results
     

@@ -19,8 +19,7 @@ class Database:
                     port=Config.DB_PORT,
                     database=Config.DB_NAME,
                     user=Config.DB_USER,
-                    password=Config.DB_PASSWORD,
-                    sslmode=Config.DB_SSLMODE
+                    password=Config.DB_PASSWORD
                 )
                 print("✅ Connection pool created")
             except Exception as e:
@@ -52,13 +51,12 @@ def with_db_connection(f):
             Database.return_connection(conn)
     return decorated
 
+
 def init_database():
-    """Инициализация базы данных - без тестовых данных"""
     conn = Database.get_connection()
     cur = conn.cursor()
     
     try:
-        # Создание таблиц
         cur.execute("""
             CREATE TABLE IF NOT EXISTS countries (
                 id SERIAL PRIMARY KEY,
@@ -79,16 +77,13 @@ def init_database():
             )
         """)
         
-        # Создание индексов
         cur.execute("CREATE INDEX IF NOT EXISTS idx_indicators_country_year ON indicators(country_id, year)")
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_indicators_year ON indicators(year)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_countries_name ON countries(name)")
         
         conn.commit()
-        print("✅ Database initialized successfully (no test data)")
-        
+        print("✅ Database initialized")
     except Exception as e:
-        print(f"❌ Database initialization error: {e}")
+        print(f"❌ Error: {e}")
         conn.rollback()
     finally:
         cur.close()

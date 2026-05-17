@@ -1,7 +1,6 @@
 from typing import Optional, List, Dict, Any, Tuple
 from database import with_db_connection
 from models.indicator import Indicator
-from utils.validators import Validators
 
 
 class IndicatorService:
@@ -33,13 +32,11 @@ class IndicatorService:
         query += " ORDER BY i.year"
         
         cur = conn.cursor()
-        cur.execute(query, params)
-        data = cur.fetchall()
-        cur.close()
-        
-        # Возвращаем пустой список, если данных нет
-        if not data:
-            return []
+        try:
+            cur.execute(query, params)
+            data = cur.fetchall()
+        finally:
+            cur.close()
         
         result = []
         for row in data:
@@ -65,18 +62,20 @@ class IndicatorService:
     @with_db_connection
     def get_country_stats(conn, country_id: int) -> Optional[Dict[str, Any]]:
         cur = conn.cursor()
-        cur.execute("""
-            SELECT 
-                COUNT(*) as years_count,
-                MIN(year) as min_year,
-                MAX(year) as max_year,
-                AVG(export_value) as avg_export,
-                AVG(import_value) as avg_import,
-                AVG(gdp_value) as avg_gdp
-            FROM indicators WHERE country_id = %s
-        """, (country_id,))
-        stats = cur.fetchone()
-        cur.close()
+        try:
+            cur.execute("""
+                SELECT 
+                    COUNT(*) as years_count,
+                    MIN(year) as min_year,
+                    MAX(year) as max_year,
+                    AVG(export_value) as avg_export,
+                    AVG(import_value) as avg_import,
+                    AVG(gdp_value) as avg_gdp
+                FROM indicators WHERE country_id = %s
+            """, (country_id,))
+            stats = cur.fetchone()
+        finally:
+            cur.close()
         
         if stats and stats['years_count'] > 0:
             return {
