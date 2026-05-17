@@ -1,33 +1,37 @@
 ```
 economic_dashboard/
-├── app.py                          # Главный файл приложения
-├── config.py                       # Конфигурация (env)
-├── database.py                     # Работа с БД и пул соединений
-├── requirements.txt                # Зависимости
-├── .env                           # Переменные окружения (создать самому)
-├── .env.example                   # Шаблон env
-├── fix_database.py                # Скрипт исправления БД
-├── reset_database.py              # Скрипт сброса БД
-├── test_csv_import.py             # Тест импорта CSV
-├── models/                        # Модели данных
+├── app.py
+├── config.py
+├── database.py
+├── requirements.txt
+├── .env
+├── .env.example
+├── models/
 │   ├── __init__.py
 │   ├── country.py
 │   ├── indicator.py
 │   └── stats.py
-├── routes/                        # Маршруты API
+├── routes/
 │   ├── __init__.py
 │   ├── countries.py
 │   ├── indicators.py
 │   └── main.py
-├── services/                      # Бизнес-логика
+├── services/
 │   ├── __init__.py
 │   ├── country_service.py
 │   ├── indicator_service.py
-│   └── csv_import_service.py
-├── utils/                         # Утилиты
+│   ├── csv_import_service.py
+│   ├── forecast_service.py
+│   └── regression_service.py
+├── utils/
 │   ├── __init__.py
 │   └── validators.py
-└── templates/                     # HTML шаблоны
+├── static/
+│   ├── css/
+│   │   └── style.css
+│   └── js/
+│       └── main.js
+└── templates/
     └── index.html
 ```
 
