@@ -454,3 +454,13 @@ button:hover {
     border-radius: 10px;
     margin: 20px 0;
 }
+
+
+.metric-card[style*="grid-column: span 2"] {
+    background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);
+}
+
+.metric-card .value {
+    word-break: break-word;
+    font-size: 14px;
+}

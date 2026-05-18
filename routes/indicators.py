@@ -77,32 +77,37 @@ def download_template():
 
 @indicators_bp.route('/api/forecast/<int:country_id>/<indicator>', methods=['GET'])
 def get_forecast(country_id, indicator):
-    """
-    Получение прогноза для страны и показателя
-    """
     try:
         steps = request.args.get('steps', 5, type=int)
         steps = min(steps, 10)
         model_type = request.args.get('model', 'auto')
+        degree = request.args.get('degree', 2, type=int)
+        
+        print(f"=== Прогноз для страны {country_id}, показатель {indicator} ===")
+        print(f"steps={steps}, model={model_type}, degree={degree}")
+        
+        if model_type == 'polynomial' and degree < 2:
+            degree = 2
+        if model_type == 'polynomial' and degree > 5:
+            degree = 5
         
         if indicator not in ['export', 'import', 'gdp']:
             return jsonify({'error': 'Неверный тип показателя. Доступные: export, import, gdp'}), 400
         
-        indicator_field = f'{indicator}_value'
+        result = ForecastService.get_forecast_for_country(
+            country_id, f'{indicator}_value', steps, model_type, degree
+        )
         
-        result = ForecastService.get_forecast_for_country(country_id, indicator_field, steps, model_type)
+        print(f"Результат: success={result.get('success')}")
+        if not result.get('success'):
+            print(f"Ошибка: {result.get('error')}")
         
-        if result.get('success'):
-            return jsonify(result)
-        else:
-            return jsonify({'error': result.get('error', 'Ошибка прогнозирования')}), 400
-            
+        return jsonify(result) if result.get('success') else jsonify({'error': result.get('error')}), 400
     except Exception as e:
-        print(f"Error in get_forecast: {e}")
+        print(f"Исключение: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
-
 
 @indicators_bp.route('/api/forecast/models', methods=['GET'])
 def get_forecast_models():
@@ -286,3 +291,4 @@ def get_available_years_for_clustering():
         return jsonify({'years': years})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    

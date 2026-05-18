@@ -88,6 +88,15 @@ async function loadData() {
         console.error('Error:', error);
     }
 }
+// Показ/скрытие выбора степени полинома
+document.getElementById('forecastModel').addEventListener('change', function() {
+    const degreeControl = document.getElementById('degreeControl');
+    if (this.value === 'polynomial') {
+        degreeControl.style.display = 'block';
+    } else {
+        degreeControl.style.display = 'none';
+    }
+});
 
 // Прогнозирование временных рядов
 async function loadForecast() {
@@ -100,11 +109,17 @@ async function loadForecast() {
     const indicator = document.getElementById('forecastIndicator').value;
     const steps = document.getElementById('forecastSteps').value;
     const model = document.getElementById('forecastModel').value;
+    const degree = document.getElementById('forecastDegree').value;
     
     showForecastLoading();
     
     try {
-        const response = await fetch(`/api/forecast/${countryId}/${indicator}?steps=${steps}&model=${model}`);
+        let url = `/api/forecast/${countryId}/${indicator}?steps=${steps}&model=${model}`;
+        if (model === 'polynomial') {
+            url += `&degree=${degree}`;
+        }
+        
+        const response = await fetch(url);
         const result = await response.json();
         
         if (result.success) {
@@ -119,6 +134,116 @@ async function loadForecast() {
     } finally {
         hideForecastLoading();
     }
+}
+
+function displayForecast(forecast) {
+    document.getElementById('forecastResult').style.display = 'block';
+    
+    const metrics = forecast.metrics || {};
+    
+    // Отображение метрик качества
+    let metricsHtml = `
+        <div class="metric-card">
+            <h4>📊 Модель</h4>
+            <div class="value">${forecast.model_type}</div>
+        </div>
+        <div class="metric-card">
+            <h4>📈 R² Score</h4>
+            <div class="value">${metrics.r2 ? metrics.r2.toFixed(4) : 'N/A'}</div>
+        </div>
+        <div class="metric-card">
+            <h4>📉 RMSE</h4>
+            <div class="value">${metrics.rmse ? metrics.rmse.toFixed(2) : 'N/A'}</div>
+        </div>
+        <div class="metric-card">
+            <h4>📊 MAE</h4>
+            <div class="value">${metrics.mae ? metrics.mae.toFixed(2) : 'N/A'}</div>
+        </div>
+    `;
+    
+    // Добавляем формулу зависимости
+    if (forecast.formula) {
+        metricsHtml += `
+            <div class="metric-card" style="grid-column: span 2; background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);">
+                <h4>📐 Формула зависимости</h4>
+                <div class="value" style="font-size: 14px; font-family: monospace;">${forecast.formula}</div>
+            </div>
+        `;
+    }
+    
+    // Добавляем дополнительные параметры
+    if (forecast.degree !== undefined) {
+        metricsHtml += `<div class="metric-card"><h4>🔢 Степень полинома</h4><div class="value">${forecast.degree}</div></div>`;
+    }
+    if (forecast.alpha !== undefined) {
+        metricsHtml += `<div class="metric-card"><h4>α (alpha)</h4><div class="value">${forecast.alpha}</div></div>`;
+    }
+    
+    document.getElementById('forecastMetrics').innerHTML = metricsHtml;
+    
+    // Построение графика
+    if (forecastChart) forecastChart.destroy();
+    
+    const allYears = [...forecast.historical_years, ...forecast.forecast_years];
+    const historical = [...forecast.historical_values, ...Array(forecast.forecast_years.length).fill(null)];
+    const forecastValues = [...Array(forecast.historical_years.length).fill(null), ...forecast.forecast];
+    
+    forecastChart = new Chart(document.getElementById('forecastChart'), {
+        type: 'line',
+        data: {
+            labels: allYears,
+            datasets: [
+                {
+                    label: 'Исторические данные',
+                    data: historical,
+                    borderColor: 'rgb(75, 192, 192)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                    borderWidth: 2,
+                    pointRadius: 4,
+                    tension: 0
+                },
+                {
+                    label: 'Прогноз',
+                    data: forecastValues,
+                    borderColor: 'rgb(255, 99, 132)',
+                    backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    pointRadius: 4,
+                    tension: 0
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.dataset.label + ': ' + 
+                                   new Intl.NumberFormat('ru-RU').format(context.parsed.y) + ' млрд USD';
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: { beginAtZero: true, title: { display: true, text: 'млрд USD' } },
+                x: { title: { display: true, text: 'Год' } }
+            }
+        }
+    });
+    
+    // Таблица прогнозов
+    let tableHtml = `<table><thead><tr><th>Год</th><th>Прогноз</th></tr></thead><tbody>`;
+    for (let i = 0; i < forecast.forecast.length; i++) {
+        tableHtml += `<tr>
+            <td><strong>${forecast.forecast_years[i]}</strong></td>
+            <td>${forecast.forecast[i].toFixed(2)} млрд USD</td>
+        </tr>`;
+    }
+    tableHtml += '</tbody></table>';
+    document.getElementById('forecastTable').innerHTML = tableHtml;
 }
 
 function displayForecast(forecast) {
@@ -140,15 +265,22 @@ function displayForecast(forecast) {
         </div>
     `;
     
-    // Добавляем дополнительную информацию о модели
-    if (forecast.intercept !== undefined) {
-        metricsHtml += `<div class="metric-card"><h4>📐 Intercept</h4><div class="value">${forecast.intercept.toFixed(2)}</div></div>`;
+    // Добавляем формулу зависимости
+    if (forecast.formula) {
+        metricsHtml += `
+            <div class="metric-card" style="grid-column: span 2; background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);">
+                <h4>📐 Формула зависимости</h4>
+                <div class="value" style="font-size: 16px; font-family: monospace;">${forecast.formula}</div>
+            </div>
+        `;
     }
-    if (forecast.slope !== undefined) {
-        metricsHtml += `<div class="metric-card"><h4>📈 Slope</h4><div class="value">${forecast.slope.toFixed(4)}</div></div>`;
+    
+    // Добавляем дополнительные параметры
+    if (forecast.intercept !== undefined && forecast.slope !== undefined && !forecast.formula) {
+        metricsHtml += `<div class="metric-card"><h4>📐 Уравнение</h4><div class="value" style="font-size: 14px;">y = ${forecast.intercept.toFixed(4)} + ${forecast.slope.toFixed(4)}·x</div></div>`;
     }
     if (forecast.degree !== undefined) {
-        metricsHtml += `<div class="metric-card"><h4>🔢 Степень</h4><div class="value">${forecast.degree}</div></div>`;
+        metricsHtml += `<div class="metric-card"><h4>🔢 Степень полинома</h4><div class="value">${forecast.degree}</div></div>`;
     }
     if (forecast.alpha !== undefined) {
         metricsHtml += `<div class="metric-card"><h4>α (alpha)</h4><div class="value">${forecast.alpha}</div></div>`;
@@ -214,7 +346,7 @@ function displayForecast(forecast) {
     for (let i = 0; i < forecast.forecast.length; i++) {
         tableHtml += `<tr><td><strong>${forecast.forecast_years[i]}</strong></td><td>${forecast.forecast[i].toFixed(2)} млрд USD</td></tr>`;
     }
-    tableHtml += '</tbody></tr>';
+    tableHtml += '</tbody></table>';
     document.getElementById('forecastTable').innerHTML = tableHtml;
 }
 
