@@ -98,14 +98,13 @@
         .countries-table {
             background: white;
             border-radius: 15px;
-            overflow-x: auto;
+            overflow: hidden;
             box-shadow: 0 5px 15px rgba(0,0,0,0.1);
         }
         
         .countries-table table {
             width: 100%;
             border-collapse: collapse;
-            min-width: 800px;
         }
         
         .countries-table th {
@@ -114,8 +113,6 @@
             padding: 15px;
             text-align: left;
             cursor: pointer;
-            position: sticky;
-            top: 0;
         }
         
         .countries-table th:hover {
@@ -125,19 +122,11 @@
         .countries-table td {
             padding: 12px 15px;
             border-bottom: 1px solid #e0e0e0;
-            vertical-align: top;
         }
         
         .countries-table tr:hover {
             background: #f5f5f5;
             cursor: pointer;
-        }
-        
-        .formula-cell {
-            font-family: monospace;
-            font-size: 12px;
-            max-width: 300px;
-            word-break: break-word;
         }
         
         .best-r2 {
@@ -222,16 +211,6 @@
             padding: 15px;
         }
         
-        .method-detail-card .formula {
-            background: #eee;
-            padding: 8px;
-            border-radius: 5px;
-            font-family: monospace;
-            font-size: 12px;
-            margin: 10px 0;
-            overflow-x: auto;
-        }
-        
         .loading {
             text-align: center;
             padding: 50px;
@@ -239,18 +218,12 @@
             color: #666;
         }
         
-        .tooltip-formula {
-            cursor: help;
-            border-bottom: 1px dashed #999;
-        }
-        
         @media (max-width: 768px) {
             .controls-panel {
                 flex-direction: column;
             }
-            .formula-cell {
-                max-width: 200px;
-                font-size: 10px;
+            .countries-table {
+                overflow-x: auto;
             }
         }
     </style>
@@ -259,7 +232,7 @@
     <div class="trends-container">
         <div class="trends-header">
             <h1>📈 Трендовый анализ всех стран</h1>
-            <p>Сравнение прогнозов, качества моделей и формул трендов для каждой страны</p>
+            <p>Сравнение прогнозов и качества моделей для каждой страны</p>
         </div>
         
         <div class="controls-panel">
@@ -294,9 +267,8 @@
                         <tr>
                             <th onclick="sortTable(0)">Страна ⬍</th>
                             <th onclick="sortTable(1)">Лучшая модель ⬍</th>
-                            <th onclick="sortTable(2)">Формула тренда</th>
-                            <th onclick="sortTable(3)">R² ⬍</th>
-                            <th onclick="sortTable(4)">Тренд ⬍</th>
+                            <th onclick="sortTable(2)">R² ⬍</th>
+                            <th onclick="sortTable(3)">Тренд ⬍</th>
                             <th>Прогноз на 1-й год</th>
                             <th>Прогноз на 5-й год</th>
                         </tr>
@@ -325,7 +297,7 @@
     
     <script>
         let currentData = [];
-        let sortColumn = 3;
+        let sortColumn = 2;
         let sortDirection = 'desc';
         
         // Загрузка трендов для всех стран
@@ -392,11 +364,11 @@
                     valA = a.best_method;
                     valB = b.best_method;
                     return sortDirection === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
-                } else if (sortColumn === 3) {
+                } else if (sortColumn === 2) {
                     valA = a.best_r2;
                     valB = b.best_r2;
                     return sortDirection === 'asc' ? valA - valB : valB - valA;
-                } else if (sortColumn === 4) {
+                } else if (sortColumn === 3) {
                     const trendA = a.best_forecast[0] - a.historical.values[a.historical.values.length - 1];
                     const trendB = b.best_forecast[0] - b.historical.values[b.historical.values.length - 1];
                     return sortDirection === 'asc' ? trendA - trendB : trendB - trendA;
@@ -420,20 +392,15 @@
                 else if (country.best_r2 >= 0.5) r2Class = 'r2-medium';
                 else r2Class = 'r2-low';
                 
-                // Находим формулу для лучшего метода
-                const bestMethodObj = country.methods.find(m => m.name === country.best_method);
-                const formula = bestMethodObj ? bestMethodObj.formula : 'N/A';
-                
                 const row = tbody.insertRow();
                 row.onclick = () => showCountryDetails(country);
                 
                 row.insertCell(0).innerHTML = `<strong>${country.country_name}</strong>`;
                 row.insertCell(1).innerHTML = country.best_method;
-                row.insertCell(2).innerHTML = `<div class="formula-cell" title="${formula}">${formula.length > 50 ? formula.substring(0, 50) + '...' : formula}</div>`;
-                row.insertCell(3).innerHTML = `<span class="${r2Class}">${country.best_r2.toFixed(4)}</span>`;
-                row.insertCell(4).innerHTML = `<span class="${trendClass}">${trendSymbol} ${Math.abs(change).toFixed(2)}</span>`;
-                row.insertCell(5).innerHTML = `${forecast1.toFixed(2)}`;
-                row.insertCell(6).innerHTML = `${forecast5.toFixed(2)}`;
+                row.insertCell(2).innerHTML = `<span class="${r2Class}">${country.best_r2.toFixed(4)}</span>`;
+                row.insertCell(3).innerHTML = `<span class="${trendClass}">${trendSymbol} ${Math.abs(change).toFixed(2)}</span>`;
+                row.insertCell(4).innerHTML = `${forecast1.toFixed(2)}`;
+                row.insertCell(5).innerHTML = `${forecast5.toFixed(2)}`;
             });
         }
         
@@ -466,7 +433,7 @@
                     methodsHtml += `
                         <div class="method-detail-card" style="${isBest ? 'border: 2px solid #27ae60;' : ''}">
                             <h4>${method.name} ${isBest ? '🏆' : ''}</h4>
-                            <div class="formula"><strong>Формула:</strong> ${method.formula}</div>
+                            <div class="formula" style="background: #eee; padding: 8px; border-radius: 5px; font-family: monospace; font-size: 12px; margin: 10px 0;">${method.formula}</div>
                             <div><strong>R²:</strong> ${method.metrics.r2.toFixed(4)}</div>
                             <div><strong>RMSE:</strong> ${method.metrics.rmse.toFixed(2)}</div>
                             <div><strong>MAE:</strong> ${method.metrics.mae.toFixed(2)}</div>
