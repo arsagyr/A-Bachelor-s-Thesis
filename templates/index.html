@@ -63,7 +63,7 @@
                 </div>
             </div>
             
-            <!-- Прогнозирование временных рядов -->
+           <!-- Прогнозирование временных рядов -->
             <div class="forecast-section" id="forecastSection" style="display:none;">
                 <h3>📈 Прогнозирование временных рядов</h3>
                 <div class="forecast-controls">
@@ -73,6 +73,16 @@
                             <option value="export">Экспорт</option>
                             <option value="import">Импорт</option>
                             <option value="gdp">ВВП</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>🤖 Модель регрессии</label>
+                        <select id="forecastModel">
+                            <option value="auto">🤖 Автоматический выбор</option>
+                            <option value="linear">📈 Линейная регрессия</option>
+                            <option value="ridge">🎯 Ridge регрессия</option>
+                            <option value="lasso">⚡ Lasso регрессия</option>
+                            <option value="polynomial">📊 Полиномиальная (степень 2)</option>
                         </select>
                     </div>
                     <div class="control-group">
@@ -98,7 +108,7 @@
                     <div id="forecastTable" class="forecast-table"></div>
                 </div>
             </div>
-            
+             
             <!-- Прогнозирование ВВП на основе экспорта и импорта -->
             <div class="gdp-forecast-section" id="gdpForecastSection" style="display:none;">
                 <h3>📊 Прогнозирование ВВП на основе экспорта и импорта</h3>
@@ -149,7 +159,45 @@
             </div>
         </div>
 
-        <!-- Добавьте эту секцию после импорта CSV и перед закрывающим div content -->
+    <!-- Кластеризация стран -->
+    <div class="clustering-section">
+        <h3>🏆 Кластеризация стран по экономическим показателям</h3>
+        <div class="clustering-controls">
+            <div class="control-group">
+                <label>📅 Год для анализа</label>
+                <select id="clusteringYear">
+                    <option value="">Последний доступный год</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>&nbsp;</label>
+                <button onclick="runClustering()" class="btn-primary" style="background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);">🔍 Провести кластеризацию</button>
+            </div>
+         </div>
+    
+        <div id="clusteringResult" style="display:none;">
+            <!-- Метод локтя -->
+            <div class="elbow-container" id="elbowContainer">
+                <h4>📊 Определение оптимального количества кластеров (метод локтя)</h4>
+                <canvas id="elbowChart"></canvas>
+            </div>
+            
+            <!-- Статистика кластеров -->
+            <div id="clusterStats" class="cluster-stats"></div>
+            
+            <!-- Результаты кластеризации -->
+            <div class="cluster-results">
+                <h4>📋 Распределение стран по кластерам</h4>
+                <div id="clusterCountries" class="cluster-countries"></div>
+            </div>
+            
+            <!-- График кластеров -->
+            <div class="cluster-visualization" id="clusterVisualization">
+                <h4>📈 Визуализация кластеров (ВВП vs Экспорт)</h4>
+                <canvas id="clusterChart"></canvas>
+            </div>
+        </div>
+    </div>
 
         <!-- Управление данными -->
         <div class="data-management-section">

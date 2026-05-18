@@ -4,6 +4,7 @@ from services.csv_import_service import CSVImportService
 from services.forecast_service import ForecastService
 from services.regression_service import RegressionService
 from services.country_service import CountryService
+from services.clustering_service import ClusteringService
 import pandas as pd
 import io
 import json
@@ -224,5 +225,64 @@ def delete_country(country_id):
         if success:
             return jsonify({'message': message})
         return jsonify({'error': message}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+
+# ==================== КЛАСТЕРИЗАЦИЯ СТРАН ====================
+
+@indicators_bp.route('/api/clustering/analyze', methods=['GET'])
+def analyze_clusters():
+    """
+    Анализ кластеризации стран по экономическим показателям
+    """
+    try:
+        year = request.args.get('year', type=int)
+        
+        result = ClusteringService.analyze_country_clusters(year)
+        
+        if result.get('success'):
+            return jsonify(result)
+        else:
+            return jsonify({'error': result.get('error', 'Ошибка кластеризации')}), 400
+            
+    except Exception as e:
+        print(f"Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@indicators_bp.route('/api/clustering/statistics', methods=['GET'])
+def get_cluster_statistics():
+    """
+    Получение статистики по кластерам
+    """
+    try:
+        year = request.args.get('year', type=int)
+        
+        result = ClusteringService.get_cluster_statistics(year)
+        
+        if result.get('success'):
+            return jsonify(result)
+        else:
+            return jsonify({'error': result.get('error', 'Ошибка получения статистики')}), 400
+            
+    except Exception as e:
+        print(f"Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@indicators_bp.route('/api/clustering/available-years', methods=['GET'])
+def get_available_years_for_clustering():
+    """
+    Получение доступных годов для кластеризации
+    """
+    try:
+        from services.indicator_service import IndicatorService
+        years = IndicatorService.get_available_years()
+        return jsonify({'years': years})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
