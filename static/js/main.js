@@ -1,6 +1,10 @@
 let trendChart = null;
 let forecastChart = null;
 let gdpForecastChart = null;
+let elbowChart = null;
+let clusterScatterChart = null;
+
+// ==================== ЗАГРУЗКА ДАННЫХ ====================
 
 // Загрузка списка стран
 async function loadCountries() {
@@ -16,7 +20,7 @@ async function loadCountries() {
             select.appendChild(option);
         });
     } catch (error) {
-        console.error('Error:', error);
+        console.error('Error loading countries:', error);
     }
 }
 
@@ -85,16 +89,17 @@ async function loadData() {
             }
         }
     } catch (error) {
-        console.error('Error:', error);
+        console.error('Error loading data:', error);
     }
 }
+
+// ==================== ПРОГНОЗИРОВАНИЕ ВРЕМЕННЫХ РЯДОВ ====================
+
 // Показ/скрытие выбора степени полинома
 document.getElementById('forecastModel').addEventListener('change', function() {
     const degreeControl = document.getElementById('degreeControl');
-    if (this.value === 'polynomial') {
-        degreeControl.style.display = 'block';
-    } else {
-        degreeControl.style.display = 'none';
+    if (degreeControl) {
+        degreeControl.style.display = this.value === 'polynomial' ? 'block' : 'none';
     }
 });
 
@@ -109,7 +114,7 @@ async function loadForecast() {
     const indicator = document.getElementById('forecastIndicator').value;
     const steps = document.getElementById('forecastSteps').value;
     const model = document.getElementById('forecastModel').value;
-    const degree = document.getElementById('forecastDegree').value;
+    const degree = document.getElementById('forecastDegree')?.value || 2;
     
     showForecastLoading();
     
@@ -122,13 +127,14 @@ async function loadForecast() {
         const response = await fetch(url);
         const result = await response.json();
         
-        if (result.success) {
+        if (result && result.success) {
             displayForecast(result);
         } else {
-            alert('Ошибка: ' + result.error);
+            alert('Ошибка: ' + (result?.error || 'Неизвестная ошибка'));
             document.getElementById('forecastResult').style.display = 'none';
         }
     } catch (error) {
+        console.error('Error:', error);
         alert('Ошибка: ' + error.message);
         document.getElementById('forecastResult').style.display = 'none';
     } finally {
@@ -136,32 +142,36 @@ async function loadForecast() {
     }
 }
 
+// Отображение прогноза
 function displayForecast(forecast) {
+    if (!forecast) {
+        console.error('No forecast data');
+        return;
+    }
+    
     document.getElementById('forecastResult').style.display = 'block';
     
     const metrics = forecast.metrics || {};
     
-    // Отображение метрик качества
     let metricsHtml = `
         <div class="metric-card">
             <h4>📊 Модель</h4>
-            <div class="value">${forecast.model_type}</div>
+            <div class="value">${forecast.model_type || 'N/A'}</div>
         </div>
         <div class="metric-card">
             <h4>📈 R² Score</h4>
-            <div class="value">${metrics.r2 ? metrics.r2.toFixed(4) : 'N/A'}</div>
+            <div class="value">${metrics.r2 !== undefined ? metrics.r2.toFixed(4) : 'N/A'}</div>
         </div>
         <div class="metric-card">
             <h4>📉 RMSE</h4>
-            <div class="value">${metrics.rmse ? metrics.rmse.toFixed(2) : 'N/A'}</div>
+            <div class="value">${metrics.rmse !== undefined ? metrics.rmse.toFixed(2) : 'N/A'}</div>
         </div>
         <div class="metric-card">
             <h4>📊 MAE</h4>
-            <div class="value">${metrics.mae ? metrics.mae.toFixed(2) : 'N/A'}</div>
+            <div class="value">${metrics.mae !== undefined ? metrics.mae.toFixed(2) : 'N/A'}</div>
         </div>
     `;
     
-    // Добавляем формулу зависимости
     if (forecast.formula) {
         metricsHtml += `
             <div class="metric-card" style="grid-column: span 2; background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);">
@@ -171,7 +181,6 @@ function displayForecast(forecast) {
         `;
     }
     
-    // Добавляем дополнительные параметры
     if (forecast.degree !== undefined) {
         metricsHtml += `<div class="metric-card"><h4>🔢 Степень полинома</h4><div class="value">${forecast.degree}</div></div>`;
     }
@@ -181,173 +190,71 @@ function displayForecast(forecast) {
     
     document.getElementById('forecastMetrics').innerHTML = metricsHtml;
     
-    // Построение графика
     if (forecastChart) forecastChart.destroy();
     
-    const allYears = [...forecast.historical_years, ...forecast.forecast_years];
-    const historical = [...forecast.historical_values, ...Array(forecast.forecast_years.length).fill(null)];
-    const forecastValues = [...Array(forecast.historical_years.length).fill(null), ...forecast.forecast];
+    const allYears = [...(forecast.historical_years || []), ...(forecast.forecast_years || [])];
+    const historical = [...(forecast.historical_values || []), ...Array(forecast.forecast_years?.length || 0).fill(null)];
+    const forecastValues = [...Array(forecast.historical_years?.length || 0).fill(null), ...(forecast.forecast || [])];
     
-    forecastChart = new Chart(document.getElementById('forecastChart'), {
-        type: 'line',
-        data: {
-            labels: allYears,
-            datasets: [
-                {
-                    label: 'Исторические данные',
-                    data: historical,
-                    borderColor: 'rgb(75, 192, 192)',
-                    backgroundColor: 'rgba(75, 192, 192, 0.1)',
-                    borderWidth: 2,
-                    pointRadius: 4,
-                    tension: 0
-                },
-                {
-                    label: 'Прогноз',
-                    data: forecastValues,
-                    borderColor: 'rgb(255, 99, 132)',
-                    backgroundColor: 'rgba(255, 99, 132, 0.1)',
-                    borderWidth: 2,
-                    borderDash: [5, 5],
-                    pointRadius: 4,
-                    tension: 0
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return context.dataset.label + ': ' + 
-                                   new Intl.NumberFormat('ru-RU').format(context.parsed.y) + ' млрд USD';
+    if (allYears.length > 0) {
+        forecastChart = new Chart(document.getElementById('forecastChart'), {
+            type: 'line',
+            data: {
+                labels: allYears,
+                datasets: [
+                    {
+                        label: 'Исторические данные',
+                        data: historical,
+                        borderColor: 'rgb(75, 192, 192)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 4,
+                        tension: 0
+                    },
+                    {
+                        label: 'Прогноз',
+                        data: forecastValues,
+                        borderColor: 'rgb(255, 99, 132)',
+                        backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        pointRadius: 4,
+                        tension: 0
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ': ' + 
+                                       new Intl.NumberFormat('ru-RU').format(context.parsed.y) + ' млрд USD';
+                            }
                         }
                     }
-                }
-            },
-            scales: {
-                y: { beginAtZero: true, title: { display: true, text: 'млрд USD' } },
-                x: { title: { display: true, text: 'Год' } }
-            }
-        }
-    });
-    
-    // Таблица прогнозов
-    let tableHtml = `<table><thead><tr><th>Год</th><th>Прогноз</th></tr></thead><tbody>`;
-    for (let i = 0; i < forecast.forecast.length; i++) {
-        tableHtml += `<tr>
-            <td><strong>${forecast.forecast_years[i]}</strong></td>
-            <td>${forecast.forecast[i].toFixed(2)} млрд USD</td>
-        </tr>`;
-    }
-    tableHtml += '</tbody></table>';
-    document.getElementById('forecastTable').innerHTML = tableHtml;
-}
-
-function displayForecast(forecast) {
-    document.getElementById('forecastResult').style.display = 'block';
-    
-    // Отображение метрик и информации о модели
-    let metricsHtml = `
-        <div class="metric-card">
-            <h4>📊 Модель</h4>
-            <div class="value">${forecast.model_type}</div>
-        </div>
-        <div class="metric-card">
-            <h4>📈 RMSE</h4>
-            <div class="value">${forecast.metrics?.rmse ? forecast.metrics.rmse.toFixed(2) : 'N/A'}</div>
-        </div>
-        <div class="metric-card">
-            <h4>📉 MAE</h4>
-            <div class="value">${forecast.metrics?.mae ? forecast.metrics.mae.toFixed(2) : 'N/A'}</div>
-        </div>
-    `;
-    
-    // Добавляем формулу зависимости
-    if (forecast.formula) {
-        metricsHtml += `
-            <div class="metric-card" style="grid-column: span 2; background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);">
-                <h4>📐 Формула зависимости</h4>
-                <div class="value" style="font-size: 16px; font-family: monospace;">${forecast.formula}</div>
-            </div>
-        `;
-    }
-    
-    // Добавляем дополнительные параметры
-    if (forecast.intercept !== undefined && forecast.slope !== undefined && !forecast.formula) {
-        metricsHtml += `<div class="metric-card"><h4>📐 Уравнение</h4><div class="value" style="font-size: 14px;">y = ${forecast.intercept.toFixed(4)} + ${forecast.slope.toFixed(4)}·x</div></div>`;
-    }
-    if (forecast.degree !== undefined) {
-        metricsHtml += `<div class="metric-card"><h4>🔢 Степень полинома</h4><div class="value">${forecast.degree}</div></div>`;
-    }
-    if (forecast.alpha !== undefined) {
-        metricsHtml += `<div class="metric-card"><h4>α (alpha)</h4><div class="value">${forecast.alpha}</div></div>`;
-    }
-    
-    document.getElementById('forecastMetrics').innerHTML = metricsHtml;
-    
-    // Построение графика
-    if (forecastChart) forecastChart.destroy();
-    
-    const allYears = [...forecast.historical_years, ...forecast.forecast_years];
-    const historical = [...forecast.historical_values, ...Array(forecast.forecast_years.length).fill(null)];
-    const forecastValues = [...Array(forecast.historical_years.length).fill(null), ...forecast.forecast];
-    
-    forecastChart = new Chart(document.getElementById('forecastChart'), {
-        type: 'line',
-        data: {
-            labels: allYears,
-            datasets: [
-                {
-                    label: 'Исторические данные',
-                    data: historical,
-                    borderColor: 'rgb(75, 192, 192)',
-                    backgroundColor: 'rgba(75, 192, 192, 0.1)',
-                    borderWidth: 2,
-                    pointRadius: 4,
-                    tension: 0
                 },
-                {
-                    label: 'Прогноз',
-                    data: forecastValues,
-                    borderColor: 'rgb(255, 99, 132)',
-                    backgroundColor: 'rgba(255, 99, 132, 0.1)',
-                    borderWidth: 2,
-                    borderDash: [5, 5],
-                    pointRadius: 4,
-                    tension: 0
+                scales: {
+                    y: { beginAtZero: true, title: { display: true, text: 'млрд USD' } },
+                    x: { title: { display: true, text: 'Год' } }
                 }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return context.dataset.label + ': ' + 
-                                   new Intl.NumberFormat('ru-RU').format(context.parsed.y) + ' млрд USD';
-                        }
-                    }
-                }
-            },
-            scales: {
-                y: { beginAtZero: true, title: { display: true, text: 'млрд USD' } },
-                x: { title: { display: true, text: 'Год' } }
             }
-        }
-    });
-    
-    // Таблица прогнозов
-    let tableHtml = `<table><thead><tr><th>Год</th><th>Прогноз</th></tr></thead><tbody>`;
-    for (let i = 0; i < forecast.forecast.length; i++) {
-        tableHtml += `<tr><td><strong>${forecast.forecast_years[i]}</strong></td><td>${forecast.forecast[i].toFixed(2)} млрд USD</td></tr>`;
+        });
     }
-    tableHtml += '</tbody></table>';
-    document.getElementById('forecastTable').innerHTML = tableHtml;
+    
+    if (forecast.forecast && forecast.forecast_years) {
+        let tableHtml = `<td><thead><tr><th>Год</th><th>Прогноз</th></tr></thead><tbody>`;
+        for (let i = 0; i < forecast.forecast.length; i++) {
+            tableHtml += `<tr>
+                <td><strong>${forecast.forecast_years[i]}</strong></td>
+                <td>${forecast.forecast[i].toFixed(2)} млрд USD</div>
+            </tr>`;
+        }
+        tableHtml += '</tbody></table>';
+        document.getElementById('forecastTable').innerHTML = tableHtml;
+    }
 }
 
 function showForecastLoading() {
@@ -367,7 +274,8 @@ function hideForecastLoading() {
     }
 }
 
-// Прогнозирование ВВП на основе экспорта и импорта
+// ==================== ПРОГНОЗИРОВАНИЕ ВВП ====================
+
 async function loadGDPForecast() {
     const countryId = document.getElementById('countrySelect').value;
     if (!countryId) {
@@ -378,127 +286,157 @@ async function loadGDPForecast() {
     const steps = document.getElementById('gdpForecastSteps').value;
     const model = document.getElementById('gdpRegressionModel').value;
     
-    showLoading();
+    showGDPForecastLoading();
     
     try {
         const response = await fetch(`/api/forecast/gdp-from-trade/${countryId}?steps=${steps}&model=${model}`);
         const result = await response.json();
         
-        if (result.success) {
+        if (result && result.success) {
             displayGDPForecast(result);
         } else {
-            alert('Ошибка: ' + result.error);
+            alert('Ошибка: ' + (result?.error || 'Неизвестная ошибка'));
         }
     } catch (error) {
+        console.error('Error:', error);
         alert('Ошибка: ' + error.message);
     } finally {
-        hideLoading();
+        hideGDPForecastLoading();
     }
 }
 
 function displayGDPForecast(forecast) {
+    if (!forecast) {
+        console.error('No forecast data');
+        return;
+    }
+    
     document.getElementById('gdpForecastResult').style.display = 'block';
     
     const metricsHtml = `
-        <div class="metric-card"><h4>📊 Модель</h4><div class="value">${forecast.model_type}</div></div>
-        <div class="metric-card"><h4>📈 R² Score</h4><div class="value">${forecast.metrics.r2.toFixed(4)}</div></div>
-        <div class="metric-card"><h4>📉 RMSE</h4><div class="value">${forecast.metrics.rmse.toFixed(2)} трлн</div></div>
-        <div class="metric-card"><h4>🎯 MAE</h4><div class="value">${forecast.metrics.mae.toFixed(2)} трлн</div></div>
+        <div class="metric-card"><h4>📊 Модель</h4><div class="value">${forecast.model_type || 'N/A'}</div></div>
+        <div class="metric-card"><h4>📈 R² Score</h4><div class="value">${forecast.metrics?.r2?.toFixed(4) || 'N/A'}</div></div>
+        <div class="metric-card"><h4>📉 RMSE</h4><div class="value">${forecast.metrics?.rmse?.toFixed(2) || 'N/A'} млрд</div></div>
+        <div class="metric-card"><h4>🎯 MAE</h4><div class="value">${forecast.metrics?.mae?.toFixed(2) || 'N/A'} млрд</div></div>
     `;
     document.getElementById('gdpForecastMetrics').innerHTML = metricsHtml;
     
     if (gdpForecastChart) gdpForecastChart.destroy();
     
-    const allYears = [...forecast.historical.years, ...forecast.forecast.years];
-    const historicalGdp = [...forecast.historical.gdp, ...Array(forecast.forecast.years.length).fill(null)];
-    const forecastGdp = [...Array(forecast.historical.years.length).fill(null), ...forecast.forecast.gdp];
+    const allYears = [...(forecast.historical?.years || []), ...(forecast.forecast?.years || [])];
+    const historicalGdp = [...(forecast.historical?.gdp || []), ...Array(forecast.forecast?.years?.length || 0).fill(null)];
+    const forecastGdp = [...Array(forecast.historical?.years?.length || 0).fill(null), ...(forecast.forecast?.gdp || [])];
     
-    const datasets = [
-        {
-            label: 'Исторический ВВП',
-            data: historicalGdp,
-            borderColor: 'rgb(75, 192, 192)',
-            borderWidth: 2,
-            pointRadius: 4
-        },
-        {
-            label: 'Прогноз ВВП',
-            data: forecastGdp,
-            borderColor: 'rgb(255, 99, 132)',
-            borderWidth: 2,
-            borderDash: [5, 5],
-            pointRadius: 4
+    if (allYears.length > 0) {
+        const datasets = [
+            {
+                label: 'Исторический ВВП',
+                data: historicalGdp,
+                borderColor: 'rgb(75, 192, 192)',
+                borderWidth: 2,
+                pointRadius: 4,
+                tension: 0
+            },
+            {
+                label: 'Прогноз ВВП',
+                data: forecastGdp,
+                borderColor: 'rgb(255, 99, 132)',
+                borderWidth: 2,
+                borderDash: [5, 5],
+                pointRadius: 4,
+                tension: 0
+            }
+        ];
+        
+        if (forecast.confidence_intervals) {
+            const lowerBounds = [...Array(forecast.historical?.years?.length || 0).fill(null), ...(forecast.confidence_intervals.lower || [])];
+            const upperBounds = [...Array(forecast.historical?.years?.length || 0).fill(null), ...(forecast.confidence_intervals.upper || [])];
+            
+            datasets.push({
+                label: 'Нижняя граница (95%)',
+                data: lowerBounds,
+                borderColor: 'rgba(255, 99, 132, 0.3)',
+                borderWidth: 1,
+                borderDash: [5, 5],
+                fill: false,
+                pointRadius: 0
+            });
+            
+            datasets.push({
+                label: 'Верхняя граница (95%)',
+                data: upperBounds,
+                borderColor: 'rgba(255, 99, 132, 0.3)',
+                borderWidth: 1,
+                borderDash: [5, 5],
+                fill: '-1',
+                pointRadius: 0
+            });
         }
-    ];
-    
-    if (forecast.confidence_intervals) {
-        const lowerBounds = [...Array(forecast.historical.years.length).fill(null), ...forecast.confidence_intervals.lower];
-        const upperBounds = [...Array(forecast.historical.years.length).fill(null), ...forecast.confidence_intervals.upper];
         
-        datasets.push({
-            label: 'Нижняя граница (95%)',
-            data: lowerBounds,
-            borderColor: 'rgba(255, 99, 132, 0.3)',
-            borderWidth: 1,
-            borderDash: [5, 5],
-            fill: false,
-            pointRadius: 0
-        });
-        
-        datasets.push({
-            label: 'Верхняя граница (95%)',
-            data: upperBounds,
-            borderColor: 'rgba(255, 99, 132, 0.3)',
-            borderWidth: 1,
-            borderDash: [5, 5],
-            fill: '-1',
-            pointRadius: 0
-        });
-    }
-    
-    gdpForecastChart = new Chart(document.getElementById('gdpForecastChart'), {
-        type: 'line',
-        data: { labels: allYears, datasets: datasets },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return context.dataset.label + ': ' + 
-                                   new Intl.NumberFormat('ru-RU').format(context.parsed.y) + 'трлн USD';
+        gdpForecastChart = new Chart(document.getElementById('gdpForecastChart'), {
+            type: 'line',
+            data: { labels: allYears, datasets: datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ': ' + 
+                                       new Intl.NumberFormat('ru-RU').format(context.parsed.y) + ' млрд USD';
+                            }
                         }
                     }
+                },
+                scales: {
+                    y: { beginAtZero: true, title: { display: true, text: 'млрд USD' } },
+                    x: { title: { display: true, text: 'Год' } }
                 }
-            },
-            scales: {
-                y: { beginAtZero: true, title: { display: true, text: 'трлн USD' } },
-                x: { title: { display: true, text: 'Год' } }
             }
-        }
-    });
-    
-    let tableHtml = `<table><thead><tr><th>Год</th><th>Прогноз экспорта</th><th>Прогноз импорта</th><th>Прогноз ВВП</th><th>Нижняя граница</th><th>Верхняя граница</th></tr></thead><tbody>`;
-    
-    for (let i = 0; i < forecast.forecast.years.length; i++) {
-        tableHtml += `
-            <tr>
-                <td><strong>${forecast.forecast.years[i]}</strong></td>
-                <td>${forecast.forecast.export[i].toFixed(2)} млрд</td>
-                <td>${forecast.forecast.import[i].toFixed(2)} млрд</td>
-                <td>${forecast.forecast.gdp[i].toFixed(2)} млрд</td>
-                <td class="confidence-interval">${forecast.confidence_intervals.lower[i].toFixed(2)} млрд</td>
-                <td class="confidence-interval">${forecast.confidence_intervals.upper[i].toFixed(2)} млрд</td>
-            </tr>
-        `;
+        });
     }
     
-    tableHtml += '</tbody></table>';
-    document.getElementById('gdpForecastTable').innerHTML = tableHtml;
+    if (forecast.forecast?.years && forecast.forecast.gdp) {
+        let tableHtml = `<table><thead><tr><th>Год</th><th>Прогноз экспорта</th><th>Прогноз импорта</th><th>Прогноз ВВП</th><th>Нижняя граница</th><th>Верхняя граница</th></tr></thead><tbody>`;
+        
+        for (let i = 0; i < forecast.forecast.years.length; i++) {
+            tableHtml += `
+                <tr>
+                    <td><strong>${forecast.forecast.years[i]}</strong></td>
+                    <td>${forecast.forecast.export?.[i]?.toFixed(2) || '-'} млрд</div>
+                    <td>${forecast.forecast.import?.[i]?.toFixed(2) || '-'} млрд</div>
+                    <td>${forecast.forecast.gdp[i]?.toFixed(2) || '-'} млрд</div>
+                    <td class="confidence-interval">${forecast.confidence_intervals?.lower?.[i]?.toFixed(2) || '-'} млрд</div>
+                    <td class="confidence-interval">${forecast.confidence_intervals?.upper?.[i]?.toFixed(2) || '-'} млрd</div>
+                </tr>
+            `;
+        }
+        
+        tableHtml += '</tbody></table>';
+        document.getElementById('gdpForecastTable').innerHTML = tableHtml;
+    }
 }
 
-// Предпросмотр CSV
+function showGDPForecastLoading() {
+    const btn = document.querySelector('#gdpForecastSection .btn-primary');
+    if (btn) {
+        btn.originalText = btn.textContent;
+        btn.textContent = '⏳ Загрузка...';
+        btn.disabled = true;
+    }
+}
+
+function hideGDPForecastLoading() {
+    const btn = document.querySelector('#gdpForecastSection .btn-primary');
+    if (btn) {
+        btn.textContent = btn.originalText || '📊 Прогноз ВВП';
+        btn.disabled = false;
+    }
+}
+
+// ==================== CSV ИМПОРТ ====================
+
 async function previewCSV() {
     const file = document.getElementById('csvFile').files[0];
     if (!file) {
@@ -534,7 +472,6 @@ async function previewCSV() {
     }
 }
 
-// Импорт CSV
 async function importCSV() {
     const file = document.getElementById('csvFile').files[0];
     const formData = new FormData();
@@ -573,37 +510,8 @@ function downloadTemplate() {
     window.location.href = '/api/csv/template';
 }
 
-function showLoading() {
-    const btn = document.querySelector('#gdpForecastSection .btn-primary');
-    if (btn) {
-        btn.originalText = btn.textContent;
-        btn.textContent = '⏳ Загрузка...';
-        btn.disabled = true;
-    }
-}
+// ==================== УПРАВЛЕНИЕ ДАННЫМИ ====================
 
-function hideLoading() {
-    const btn = document.querySelector('#gdpForecastSection .btn-primary');
-    if (btn) {
-        btn.textContent = btn.originalText || '📊 Прогноз ВВП';
-        btn.disabled = false;
-    }
-}
-
-// Обработчики событий
-document.getElementById('countrySelect').addEventListener('change', function() {
-    const show = this.value ? 'block' : 'none';
-    document.getElementById('forecastSection').style.display = show;
-    document.getElementById('gdpForecastSection').style.display = show;
-});
-
-// Инициализация
-document.addEventListener('DOMContentLoaded', () => {
-    loadCountries();
-    loadData();
-});
-
-// Загрузка списка показателей для удаления
 async function loadIndicatorsForDelete() {
     const countryId = document.getElementById('countrySelect').value;
     if (!countryId) {
@@ -629,7 +537,6 @@ async function loadIndicatorsForDelete() {
     }
 }
 
-// Загрузка списка стран для удаления показателей
 async function loadCountriesForDelete() {
     try {
         const response = await fetch('/api/countries');
@@ -657,7 +564,6 @@ async function loadCountriesForDelete() {
     }
 }
 
-// Удаление выбранного показателя
 async function deleteSelectedIndicator() {
     const indicatorId = document.getElementById('deleteIndicatorSelect').value;
     if (!indicatorId) {
@@ -685,7 +591,6 @@ async function deleteSelectedIndicator() {
     }
 }
 
-// Удаление всех показателей страны
 async function deleteCountryIndicators() {
     const countryId = document.getElementById('deleteCountryIndicatorsSelect').value;
     if (!countryId) {
@@ -717,7 +622,6 @@ async function deleteCountryIndicators() {
     }
 }
 
-// Удаление страны
 async function deleteCountry() {
     const countryId = document.getElementById('deleteCountrySelect').value;
     if (!countryId) {
@@ -751,31 +655,8 @@ async function deleteCountry() {
     }
 }
 
-// Обновите обработчик события выбора страны
-document.getElementById('countrySelect').addEventListener('change', function() {
-    const show = this.value ? 'block' : 'none';
-    document.getElementById('forecastSection').style.display = show;
-    document.getElementById('gdpForecastSection').style.display = show;
-    
-    // Загружаем показатели для удаления
-    if (this.value) {
-        loadIndicatorsForDelete();
-    } else {
-        document.getElementById('deleteIndicatorSelect').innerHTML = '<option value="">Выберите показатель</option>';
-    }
-});
+// ==================== КЛАСТЕРИЗАЦИЯ ====================
 
-// Загрузка стран для удаления при загрузке страницы
-document.addEventListener('DOMContentLoaded', () => {
-    loadCountries();
-    loadData();
-    loadCountriesForDelete();
-});
-
-let elbowChart = null;
-let clusterScatterChart = null;
-
-// Загрузка доступных годов для кластеризации
 async function loadClusteringYears() {
     try {
         const response = await fetch('/api/clustering/available-years');
@@ -795,7 +676,6 @@ async function loadClusteringYears() {
     }
 }
 
-// Запуск кластеризации
 async function runClustering() {
     const year = document.getElementById('clusteringYear').value;
     
@@ -805,8 +685,6 @@ async function runClustering() {
         const url = year ? `/api/clustering/analyze?year=${year}` : '/api/clustering/analyze';
         const response = await fetch(url);
         const result = await response.json();
-        
-        console.log('Clustering result:', result); // Для отладки
         
         if (result.success) {
             displayClusteringResults(result);
@@ -823,11 +701,9 @@ async function runClustering() {
     }
 }
 
-// Отображение результатов кластеризации
 function displayClusteringResults(results) {
     document.getElementById('clusteringResult').style.display = 'block';
     
-    // 1. График метода локтя
     if (results.elbow_analysis && results.elbow_analysis.k_values && results.elbow_analysis.k_values.length > 0) {
         if (elbowChart) elbowChart.destroy();
         
@@ -865,13 +741,7 @@ function displayClusteringResults(results) {
         });
     }
     
-    // Получаем количество стран по каждому типу из distribution
-    const typeCounts = {
-        'Передовые': 0,
-        'Средние': 0,
-        'Отстающие': 0
-    };
-    
+    const typeCounts = { 'Передовые': 0, 'Средние': 0, 'Отстающие': 0 };
     if (results.countries) {
         results.countries.forEach(country => {
             if (typeCounts.hasOwnProperty(country.cluster_type)) {
@@ -880,14 +750,8 @@ function displayClusteringResults(results) {
         });
     }
     
-    // 2. Статистика кластеров (используем актуальные данные из стран)
     let statsHtml = '';
-    const colorMap = {
-        'Передовые': '#2ecc71',
-        'Средние': '#f39c12',
-        'Отстающие': '#e74c3c'
-    };
-    
+    const colorMap = { 'Передовые': '#2ecc71', 'Средние': '#f39c12', 'Отстающие': '#e74c3c' };
     const types = ['Передовые', 'Средние', 'Отстающие'];
     
     types.forEach(type => {
@@ -895,7 +759,6 @@ function displayClusteringResults(results) {
         const clusterCountries = results.countries ? results.countries.filter(c => c.cluster_type === type) : [];
         const actualSize = clusterCountries.length;
         
-        // Рассчитываем средние значения для кластера
         let avgGdp = 0, avgExport = 0, avgImport = 0;
         if (actualSize > 0) {
             avgGdp = clusterCountries.reduce((sum, c) => sum + c.gdp_value, 0) / actualSize;
@@ -921,14 +784,11 @@ function displayClusteringResults(results) {
     }
     document.getElementById('clusterStats').innerHTML = statsHtml;
     
-    // 3. Распределение стран по кластерам
     let countriesHtml = '';
-    
     types.forEach(type => {
         const clusterCountries = results.countries ? results.countries.filter(c => c.cluster_type === type) : [];
         if (clusterCountries.length > 0) {
             const typeClass = type === 'Передовые' ? 'leading' : (type === 'Средние' ? 'middle' : 'lagging');
-            
             countriesHtml += `
                 <div class="cluster-group ${typeClass}">
                     <h5>${type} (${clusterCountries.length} стран)</h5>
@@ -943,7 +803,6 @@ function displayClusteringResults(results) {
     }
     document.getElementById('clusterCountries').innerHTML = countriesHtml;
     
-    // 4. График кластеров
     if (clusterScatterChart) clusterScatterChart.destroy();
 
     const datasets = [];
@@ -961,7 +820,7 @@ function displayClusteringResults(results) {
                 data: clusterCountries.map(c => ({
                     x: c.export_value || 0,
                     y: c.gdp_value || 0,
-                    countryName: c.country_name  // Добавляем название страны
+                    countryName: c.country_name
                 })),
                 backgroundColor: colors[type],
                 borderColor: colors[type].replace('0.7', '1'),
@@ -986,7 +845,6 @@ function displayClusteringResults(results) {
                             label: function(context) {
                                 const label = context.dataset.label || '';
                                 const value = context.raw;
-                                // Добавляем название страны в подсказку
                                 return `${value.countryName}: ${label}\nЭкспорт: ${value.x.toFixed(2)} трлн USD\nВВП: ${value.y.toFixed(2)} трлн USD`;
                             }
                         }
@@ -1018,9 +876,25 @@ function hideClusteringLoading() {
     }
 }
 
-// Добавьте вызов в DOMContentLoaded
+// ==================== ОБРАБОТЧИКИ СОБЫТИЙ ====================
+
+document.getElementById('countrySelect').addEventListener('change', function() {
+    const show = this.value ? 'block' : 'none';
+    document.getElementById('forecastSection').style.display = show;
+    document.getElementById('gdpForecastSection').style.display = show;
+    
+    if (this.value) {
+        loadIndicatorsForDelete();
+    } else {
+        document.getElementById('deleteIndicatorSelect').innerHTML = '<option value="">Выберите показатель</option>';
+    }
+});
+
+// ==================== ИНИЦИАЛИЗАЦИЯ ====================
+
 document.addEventListener('DOMContentLoaded', () => {
     loadCountries();
     loadData();
+    loadCountriesForDelete();
     loadClusteringYears();
 });

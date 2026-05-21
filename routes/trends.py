@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify
 from services.trend_analysis_service import TrendAnalysisService
 import numpy as np
-from database import with_db_connection
+from database import Database
 
 trends_bp = Blueprint('trends', __name__)
 
@@ -47,8 +47,6 @@ def get_single_country_trend(country_id, indicator):
         if indicator not in ['export', 'import', 'gdp']:
             return jsonify({'error': 'Неверный тип показателя'}), 400
         
-        # Получаем данные напрямую через соединение
-        from database import Database
         conn = Database.get_connection()
         
         try:

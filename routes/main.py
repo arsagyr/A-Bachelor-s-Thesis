@@ -5,4 +5,5 @@ main_bp = Blueprint('main', __name__)
 
 @main_bp.route('/')
 def index():
+    """Главная страница с прогнозированием"""
     return render_template('index.html')

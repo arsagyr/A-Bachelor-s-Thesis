@@ -3,505 +3,243 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Трендовый анализ всех стран - Economic Dashboard</title>
+    <title>Экономические показатели стран</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <style>
-        .trends-container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        
-        .trends-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 30px;
-            border-radius: 20px;
-            margin-bottom: 30px;
-            text-align: center;
-        }
-        
-        .trends-header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
-        }
-        
-        .controls-panel {
-            background: white;
-            padding: 20px;
-            border-radius: 15px;
-            margin-bottom: 30px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-            display: flex;
-            gap: 20px;
-            flex-wrap: wrap;
-            align-items: flex-end;
-        }
-        
-        .control-group {
-            flex: 1;
-            min-width: 200px;
-        }
-        
-        .control-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
-            color: #333;
-        }
-        
-        .control-group select {
-            width: 100%;
-            padding: 10px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 14px;
-        }
-        
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 10px 25px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-        }
-        
-        .stats-summary {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-        
-        .stat-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 15px;
-            text-align: center;
-        }
-        
-        .stat-card h3 {
-            font-size: 14px;
-            opacity: 0.9;
-            margin-bottom: 10px;
-        }
-        
-        .stat-card .value {
-            font-size: 28px;
-            font-weight: bold;
-        }
-        
-        .countries-table {
-            background: white;
-            border-radius: 15px;
-            overflow-x: auto;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-        }
-        
-        .countries-table table {
-            width: 100%;
-            border-collapse: collapse;
-            min-width: 800px;
-        }
-        
-        .countries-table th {
-            background: #667eea;
-            color: white;
-            padding: 15px;
-            text-align: left;
-            cursor: pointer;
-            position: sticky;
-            top: 0;
-        }
-        
-        .countries-table th:hover {
-            background: #5a6fd6;
-        }
-        
-        .countries-table td {
-            padding: 12px 15px;
-            border-bottom: 1px solid #e0e0e0;
-            vertical-align: top;
-        }
-        
-        .countries-table tr:hover {
-            background: #f5f5f5;
-            cursor: pointer;
-        }
-        
-        .formula-cell {
-            font-family: monospace;
-            font-size: 12px;
-            max-width: 300px;
-            word-break: break-word;
-        }
-        
-        .best-r2 {
-            background: #d4edda;
-            font-weight: bold;
-        }
-        
-        .r2-high {
-            color: #27ae60;
-            font-weight: bold;
-        }
-        
-        .r2-medium {
-            color: #f39c12;
-            font-weight: bold;
-        }
-        
-        .r2-low {
-            color: #e74c3c;
-        }
-        
-        .trend-up {
-            color: #27ae60;
-        }
-        
-        .trend-down {
-            color: #e74c3c;
-        }
-        
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.5);
-        }
-        
-        .modal-content {
-            background-color: white;
-            margin: 5% auto;
-            padding: 20px;
-            width: 90%;
-            max-width: 1000px;
-            border-radius: 20px;
-            max-height: 80%;
-            overflow-y: auto;
-        }
-        
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #e0e0e0;
-        }
-        
-        .close {
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-            color: #666;
-        }
-        
-        .close:hover {
-            color: #333;
-        }
-        
-        .methods-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin: 20px 0;
-        }
-        
-        .method-detail-card {
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 15px;
-        }
-        
-        .method-detail-card .formula {
-            background: #eee;
-            padding: 8px;
-            border-radius: 5px;
-            font-family: monospace;
-            font-size: 12px;
-            margin: 10px 0;
-            overflow-x: auto;
-        }
-        
-        .loading {
-            text-align: center;
-            padding: 50px;
-            font-size: 18px;
-            color: #666;
-        }
-        
-        .tooltip-formula {
-            cursor: help;
-            border-bottom: 1px dashed #999;
-        }
-        
-        @media (max-width: 768px) {
-            .controls-panel {
-                flex-direction: column;
-            }
-            .formula-cell {
-                max-width: 200px;
-                font-size: 10px;
-            }
-        }
-    </style>
 </head>
 <body>
-    <div class="trends-container">
-        <div class="trends-header">
-            <h1>📈 Трендовый анализ всех стран</h1>
-            <p>Сравнение прогнозов, качества моделей и формул трендов для каждой страны</p>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Экономические показатели стран</h1>
+            <p>Визуализация и прогнозирование экспорта, импорта и ВВП</p>
         </div>
         
-        <div class="controls-panel">
+        <div class="content">
+            <!-- Фильтры -->
+            <div class="controls">
+                <div class="control-group">
+                    <label>🌍 Выберите страну</label>
+                    <select id="countrySelect">
+                        <option value="">Все страны</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>📈 Тип показателя</label>
+                    <select id="indicatorType">
+                        <option value="all">Все показатели</option>
+                        <option value="export">Экспорт</option>
+                        <option value="import">Импорт</option>
+                        <option value="gdp">ВВП</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>📅 Год от</label>
+                    <input type="number" id="startYear" placeholder="Начальный год">
+                </div>
+                <div class="control-group">
+                    <label>📅 Год до</label>
+                    <input type="number" id="endYear" placeholder="Конечный год">
+                </div>
+                <div class="control-group">
+                    <label>&nbsp;</label>
+                    <button onclick="loadData()">🔍 Показать данные</button>
+                </div>
+            </div>
+            
+            <!-- Статистика -->
+            <div id="statsContainer" class="stats"></div>
+            
+            <!-- График динамики -->
+            <div class="chart-container">
+                <h3>📈 Динамика экономических показателей</h3>
+                <canvas id="trendChart"></canvas>
+                <div id="trendEmptyMessage" style="display:none; text-align:center; padding:50px; color:#999;">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="margin-bottom: 15px;">
+                        <path d="M21 21H4V4M7 15l4-4 4 4 5-5"/>
+                    </svg>
+                    <h3>Нет данных для отображения</h3>
+                    <p>Загрузите данные через CSV или добавьте вручную</p>
+                    <button onclick="document.getElementById('csvFile').click()" class="btn-primary">📁 Загрузить CSV</button>
+                </div>
+            </div>
+            
+           <!-- Прогнозирование временных рядов -->
+            <div class="forecast-section" id="forecastSection" style="display:none;">
+                <h3>📈 Прогнозирование временных рядов</h3>
+                <div class="forecast-controls">
+                    <div class="control-group">
+                        <label>📊 Показатель для прогноза</label>
+                        <select id="forecastIndicator">
+                            <option value="export">Экспорт</option>
+                            <option value="import">Импорт</option>
+                            <option value="gdp">ВВП</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>🤖 Модель регрессии</label>
+                        <select id="forecastModel">
+                            <option value="auto">🤖 Автоматический выбор</option>
+                            <option value="linear">📈 Линейная регрессия</option>
+                            <option value="ridge">🎯 Ridge регрессия</option>
+                            <option value="lasso">⚡ Lasso регрессия</option>
+                            <option value="polynomial">📊 Полиномиальная регрессия</option>
+                        </select>
+                    </div>
+                    <div class="control-group" id="degreeControl" style="display:none;">
+                        <label>🔢 Степень полинома</label>
+                        <select id="forecastDegree">
+                            <option value="2">2 (квадратичная)</option>
+                            <option value="3">3 (кубическая)</option>
+                            <option value="4">4</option>
+                            <option value="5">5</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>🔮 Горизонт прогноза</label>
+                        <select id="forecastSteps">
+                            <option value="3">3 года</option>
+                            <option value="5" selected>5 лет</option>
+                            <option value="7">7 лет</option>
+                            <option value="10">10 лет</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>&nbsp;</label>
+                        <button onclick="loadForecast()" class="btn-primary">🔮 Построить прогноз</button>
+                    </div>
+                </div>
+                
+                <div id="forecastResult" style="display:none;">
+                    <div id="forecastMetrics" class="forecast-metrics"></div>
+                    <div class="forecast-chart-container">
+                        <canvas id="forecastChart"></canvas>
+                    </div>
+                    <div id="forecastTable" class="forecast-table"></div>
+                </div>
+            </div>
+             
+            <!-- Прогнозирование ВВП на основе экспорта и импорта -->
+            <div class="gdp-forecast-section" id="gdpForecastSection" style="display:none;">
+                <h3>📊 Прогнозирование ВВП на основе экспорта и импорта</h3>
+                <div class="gdp-forecast-controls">
+                    <div class="control-group">
+                        <label>📈 Модель регрессии</label>
+                        <select id="gdpRegressionModel">
+                            <option value="linear">Линейная регрессия</option>
+                            <option value="ridge">Ridge регрессия</option>
+                            <option value="lasso">Lasso регрессия</option>
+                            <option value="polynomial">Полиномиальная</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>🔮 Горизонт прогноза</label>
+                        <select id="gdpForecastSteps">
+                            <option value="3">3 года</option>
+                            <option value="5" selected>5 лет</option>
+                            <option value="7">7 лет</option>
+                            <option value="10">10 лет</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>&nbsp;</label>
+                        <button onclick="loadGDPForecast()" class="btn-primary" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);">📊 Прогноз ВВП</button>
+                    </div>
+                </div>
+                
+                <div id="gdpForecastResult" style="display:none;">
+                    <div id="gdpForecastMetrics" class="forecast-metrics"></div>
+                    <div class="forecast-chart-container">
+                        <canvas id="gdpForecastChart"></canvas>
+                    </div>
+                    <div id="gdpForecastTable" class="forecast-table"></div>
+                </div>
+            </div>
+            
+            <!-- Импорт CSV -->
+            <div class="csv-import-section">
+                <h3>📁 Импорт данных из CSV/Excel</h3>
+                <div class="import-controls">
+                    <input type="file" id="csvFile" accept=".csv,.xlsx" class="file-input">
+                    <button onclick="previewCSV()" class="btn-secondary">👁️ Предпросмотр</button>
+                    <button onclick="downloadTemplate()" class="btn-secondary">📄 Скачать шаблон</button>
+                </div>
+                <div id="previewContainer" style="display:none;"></div>
+                <div id="importResult"></div>
+            </div>
+        </div>
+
+    <!-- Кластеризация стран -->
+    <div class="clustering-section">
+        <h3>🏆 Кластеризация стран по экономическим показателям</h3>
+        <div class="clustering-controls">
             <div class="control-group">
-                <label>📊 Показатель</label>
-                <select id="indicatorSelect">
-                    <option value="gdp">ВВП</option>
-                    <option value="export">Экспорт</option>
-                    <option value="import">Импорт</option>
+                <label>📅 Год для анализа</label>
+                <select id="clusteringYear">
+                    <option value="">Последний доступный год</option>
                 </select>
             </div>
             <div class="control-group">
-                <label>🔮 Горизонт прогноза</label>
-                <select id="stepsSelect">
-                    <option value="3">3 года</option>
-                    <option value="5" selected>5 лет</option>
-                    <option value="7">7 лет</option>
-                    <option value="10">10 лет</option>
-                </select>
+                <label>&nbsp;</label>
+                <button onclick="runClustering()" class="btn-primary" style="background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);">🔍 Провести кластеризацию</button>
             </div>
-            <div class="control-group">
-                <button onclick="loadAllTrends()" class="btn-primary">🔍 Анализировать</button>
+         </div>
+    
+        <div id="clusteringResult" style="display:none;">
+            <!-- Метод локтя -->
+            <div class="elbow-container" id="elbowContainer">
+                <h4>📊 Определение оптимального количества кластеров (метод локтя)</h4>
+                <canvas id="elbowChart"></canvas>
             </div>
-        </div>
-        
-        <div id="statsContainer" class="stats-summary"></div>
-        
-        <div id="resultsContainer" style="display:none;">
-            <div class="countries-table">
-                <table id="countriesTable">
-                    <thead>
-                        <tr>
-                            <th onclick="sortTable(0)">Страна ⬍</th>
-                            <th onclick="sortTable(1)">Лучшая модель ⬍</th>
-                            <th onclick="sortTable(2)">Формула тренда</th>
-                            <th onclick="sortTable(3)">R² ⬍</th>
-                            <th onclick="sortTable(4)">Тренд ⬍</th>
-                            <th>Прогноз на 1-й год</th>
-                            <th>Прогноз на 5-й год</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tableBody">
-                    </tbody>
-                </table>
+            
+            <!-- Статистика кластеров -->
+            <div id="clusterStats" class="cluster-stats"></div>
+            
+            <!-- Результаты кластеризации -->
+            <div class="cluster-results">
+                <h4>📋 Распределение стран по кластерам</h4>
+                <div id="clusterCountries" class="cluster-countries"></div>
             </div>
-        </div>
-        
-        <div id="loadingMessage" class="loading" style="display:none;">
-            ⏳ Загрузка данных...
+            
+            <!-- График кластеров -->
+            <div class="cluster-visualization" id="clusterVisualization">
+                <h4>📈 Визуализация кластеров (ВВП vs Экспорт)</h4>
+                <canvas id="clusterChart"></canvas>
+            </div>
         </div>
     </div>
-    
-    <!-- Модальное окно для деталей страны -->
-    <div id="countryModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="modalTitle">Детальный анализ</h2>
-                <span class="close" onclick="closeModal()">&times;</span>
+
+        <!-- Управление данными -->
+        <div class="data-management-section">
+            <h3>🗑️ Управление данными</h3>
+            <div class="management-controls">
+                <div class="control-group">
+                    <label>📊 Удалить показатель</label>
+                    <select id="deleteIndicatorSelect">
+                        <option value="">Выберите показатель</option>
+                    </select>
+                    <button onclick="deleteSelectedIndicator()" class="btn-danger" style="margin-top: 5px;">🗑️ Удалить показатель</button>
+                </div>
+                
+                <div class="control-group">
+                    <label>🏢 Удалить все показатели страны</label>
+                    <select id="deleteCountryIndicatorsSelect">
+                        <option value="">Выберите страну</option>
+                    </select>
+                    <button onclick="deleteCountryIndicators()" class="btn-warning" style="margin-top: 5px;">⚠️ Удалить показатели страны</button>
+                </div>
+                
+                <div class="control-group">
+                    <label>🗑️ Удалить страну (все данные)</label>
+                            <select id="deleteCountrySelect">
+                                <option value="">Выберите страну</option>
+                            </select>
+                            <button onclick="deleteCountry()" class="btn-danger" style="margin-top: 5px;">🔥 Удалить страну</button>
+                </div>
             </div>
-            <div id="modalBody"></div>
         </div>
+
     </div>
     
-    <script>
-        let currentData = [];
-        let sortColumn = 3;
-        let sortDirection = 'desc';
-        
-        // Загрузка трендов для всех стран
-        async function loadAllTrends() {
-            const indicator = document.getElementById('indicatorSelect').value;
-            const steps = document.getElementById('stepsSelect').value;
-            
-            document.getElementById('loadingMessage').style.display = 'block';
-            document.getElementById('resultsContainer').style.display = 'none';
-            
-            try {
-                const response = await fetch(`/api/trends/all-countries?indicator=${indicator}&steps=${steps}`);
-                const result = await response.json();
-                
-                if (result.success) {
-                    currentData = result.countries;
-                    displayResults(result);
-                } else {
-                    alert('Ошибка: ' + result.error);
-                }
-            } catch (error) {
-                alert('Ошибка: ' + error.message);
-            } finally {
-                document.getElementById('loadingMessage').style.display = 'none';
-                document.getElementById('resultsContainer').style.display = 'block';
-            }
-        }
-        
-        // Отображение результатов
-        function displayResults(data) {
-            // Статистика
-            const statsHtml = `
-                <div class="stat-card">
-                    <h3>🌍 Всего стран</h3>
-                    <div class="value">${data.total_countries}</div>
-                </div>
-                <div class="stat-card">
-                    <h3>📊 Показатель</h3>
-                    <div class="value">${data.indicator_name}</div>
-                </div>
-                <div class="stat-card">
-                    <h3>🔮 Горизонт</h3>
-                    <div class="value">${data.steps} лет</div>
-                </div>
-                <div class="stat-card">
-                    <h3>🏆 Лучший R²</h3>
-                    <div class="value">${Math.max(...data.countries.map(c => c.best_r2)).toFixed(4)}</div>
-                </div>
-            `;
-            document.getElementById('statsContainer').innerHTML = statsHtml;
-            
-            // Таблица стран
-            renderTable();
-        }
-        
-        function renderTable() {
-            const sortedData = [...currentData].sort((a, b) => {
-                let valA, valB;
-                if (sortColumn === 0) {
-                    valA = a.country_name;
-                    valB = b.country_name;
-                    return sortDirection === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
-                } else if (sortColumn === 1) {
-                    valA = a.best_method;
-                    valB = b.best_method;
-                    return sortDirection === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
-                } else if (sortColumn === 3) {
-                    valA = a.best_r2;
-                    valB = b.best_r2;
-                    return sortDirection === 'asc' ? valA - valB : valB - valA;
-                } else if (sortColumn === 4) {
-                    const trendA = a.best_forecast[0] - a.historical.values[a.historical.values.length - 1];
-                    const trendB = b.best_forecast[0] - b.historical.values[b.historical.values.length - 1];
-                    return sortDirection === 'asc' ? trendA - trendB : trendB - trendA;
-                }
-                return 0;
-            });
-            
-            const tbody = document.getElementById('tableBody');
-            tbody.innerHTML = '';
-            
-            sortedData.forEach(country => {
-                const lastValue = country.historical.values[country.historical.values.length - 1];
-                const forecast1 = country.best_forecast[0];
-                const forecast5 = country.best_forecast[4] || country.best_forecast[country.best_forecast.length - 1];
-                const change = forecast1 - lastValue;
-                const trendClass = change >= 0 ? 'trend-up' : 'trend-down';
-                const trendSymbol = change >= 0 ? '↑' : '↓';
-                
-                let r2Class = '';
-                if (country.best_r2 >= 0.8) r2Class = 'r2-high';
-                else if (country.best_r2 >= 0.5) r2Class = 'r2-medium';
-                else r2Class = 'r2-low';
-                
-                // Находим формулу для лучшего метода
-                const bestMethodObj = country.methods.find(m => m.name === country.best_method);
-                const formula = bestMethodObj ? bestMethodObj.formula : 'N/A';
-                
-                const row = tbody.insertRow();
-                row.onclick = () => showCountryDetails(country);
-                
-                row.insertCell(0).innerHTML = `<strong>${country.country_name}</strong>`;
-                row.insertCell(1).innerHTML = country.best_method;
-                row.insertCell(2).innerHTML = `<div class="formula-cell" title="${formula}">${formula.length > 50 ? formula.substring(0, 50) + '...' : formula}</div>`;
-                row.insertCell(3).innerHTML = `<span class="${r2Class}">${country.best_r2.toFixed(4)}</span>`;
-                row.insertCell(4).innerHTML = `<span class="${trendClass}">${trendSymbol} ${Math.abs(change).toFixed(2)}</span>`;
-                row.insertCell(5).innerHTML = `${forecast1.toFixed(2)}`;
-                row.insertCell(6).innerHTML = `${forecast5.toFixed(2)}`;
-            });
-        }
-        
-        // Сортировка таблицы
-        function sortTable(column) {
-            if (sortColumn === column) {
-                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
-            } else {
-                sortColumn = column;
-                sortDirection = 'desc';
-            }
-            renderTable();
-        }
-        
-        // Показ деталей страны
-        async function showCountryDetails(country) {
-            const indicator = document.getElementById('indicatorSelect').value;
-            const steps = document.getElementById('stepsSelect').value;
-            
-            // Получаем данные для страны
-            const response = await fetch(`/api/trends/single-country/${country.country_id}/${indicator}?steps=${steps}`);
-            const result = await response.json();
-            
-            if (result.success) {
-                const data = result.data;
-                
-                let methodsHtml = '<div class="methods-grid">';
-                data.methods.forEach(method => {
-                    const isBest = method.name === data.best_method;
-                    methodsHtml += `
-                        <div class="method-detail-card" style="${isBest ? 'border: 2px solid #27ae60;' : ''}">
-                            <h4>${method.name} ${isBest ? '🏆' : ''}</h4>
-                            <div class="formula"><strong>Формула:</strong> ${method.formula}</div>
-                            <div><strong>R²:</strong> ${method.metrics.r2.toFixed(4)}</div>
-                            <div><strong>RMSE:</strong> ${method.metrics.rmse.toFixed(2)}</div>
-                            <div><strong>MAE:</strong> ${method.metrics.mae.toFixed(2)}</div>
-                            <div><strong>MAPE:</strong> ${method.metrics.mape.toFixed(1)}%</div>
-                            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd;">
-                                <strong>Прогноз:</strong><br>
-                                ${data.forecast_years.map((y, i) => `${y}: ${method.forecast[i].toFixed(2)}`).join(' → ')}
-                            </div>
-                        </div>
-                    `;
-                });
-                methodsHtml += '</div>';
-                
-                document.getElementById('modalTitle').innerHTML = `${data.country_name} - ${data.indicator_name}`;
-                document.getElementById('modalBody').innerHTML = methodsHtml;
-                document.getElementById('countryModal').style.display = 'block';
-            } else {
-                alert('Ошибка загрузки деталей');
-            }
-        }
-        
-        function closeModal() {
-            document.getElementById('countryModal').style.display = 'none';
-        }
-        
-        // Закрытие модального окна по клику вне
-        window.onclick = function(event) {
-            const modal = document.getElementById('countryModal');
-            if (event.target === modal) {
-                modal.style.display = 'none';
-            }
-        }
-        
-        // Инициализация
-        loadAllTrends();
-    </script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>

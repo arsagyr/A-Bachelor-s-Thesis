@@ -6,6 +6,7 @@ from routes.trends import trends_bp
 
 
 def register_routes(app: Flask):
+    """Регистрация всех маршрутов"""
     app.register_blueprint(main_bp)
     app.register_blueprint(countries_bp)
     app.register_blueprint(indicators_bp)

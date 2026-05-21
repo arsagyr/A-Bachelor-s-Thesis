@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from typing import Dict, List, Any, Tuple, Optional
 from sklearn.linear_model import LinearRegression, Ridge, Lasso
-from sklearn.preprocessing import PolynomialFeatures
+from sklearn.preprocessing import PolynomialFeatures, StandardScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import warnings
 warnings.filterwarnings('ignore')
@@ -51,40 +51,18 @@ class ForecastService:
             return obj
     
     @staticmethod
-    def get_formula(model_type: str, intercept: float, slope: float = None, 
-                    coefficients: List[float] = None, degree: int = 2) -> str:
-        """Формирование формулы зависимости"""
-        if model_type == 'Linear Regression':
-            return f"y = {intercept:.4f} + {slope:.4f}·x"
-        elif model_type == 'Ridge Regression':
-            return f"y = {intercept:.4f} + {slope:.4f}·x (Ridge)"
-        elif model_type == 'Lasso Regression':
-            return f"y = {intercept:.4f} + {slope:.4f}·x (Lasso)"
-        elif 'Polynomial' in model_type:
-            if coefficients and len(coefficients) >= 1:
-                formula = f"y = {intercept:.4f}"
-                for i, coef in enumerate(coefficients):
-                    if i == 0:
-                        formula += f" + {coef:.4f}·x"
-                    elif i == 1:
-                        formula += f" + {coef:.4f}·x²"
-                    else:
-                        formula += f" + {coef:.4f}·x^{i+1}"
-                return formula
-            return f"y = {intercept:.4f} + полином степени {degree}"
-        return f"y = {intercept:.4f}"
-    
-    @staticmethod
     def calculate_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
         """Расчет метрик качества модели"""
         rmse = np.sqrt(mean_squared_error(y_true, y_pred))
         mae = mean_absolute_error(y_true, y_pred)
         r2 = r2_score(y_true, y_pred)
+        mape = np.mean(np.abs((y_true - y_pred) / y_true)) * 100 if np.all(y_true != 0) else 100
         
         return {
             'rmse': float(rmse),
             'mae': float(mae),
-            'r2': float(r2)
+            'r2': float(r2),
+            'mape': float(mape)
         }
     
     @staticmethod
@@ -111,7 +89,7 @@ class ForecastService:
             y_pred = model.predict(X)
             metrics = ForecastService.calculate_metrics(y, y_pred)
             
-            formula = f"y = {model.intercept_:.4f} + {model.coef_[0]:.4f}·x"
+            formula = f"y = {model.intercept_:.4f} + {model.coef_[0]:.4f}·t"
             
             return {
                 'success': True,
@@ -139,17 +117,22 @@ class ForecastService:
             X = np.arange(len(clean_series)).reshape(-1, 1)
             y = np.array(clean_series)
             
+            # Стандартизация для Ridge
+            scaler = StandardScaler()
+            X_scaled = scaler.fit_transform(X)
+            
             model = Ridge(alpha=alpha)
-            model.fit(X, y)
+            model.fit(X_scaled, y)
             
             future_X = np.arange(len(clean_series), len(clean_series) + steps).reshape(-1, 1)
-            forecast = model.predict(future_X)
+            future_X_scaled = scaler.transform(future_X)
+            forecast = model.predict(future_X_scaled)
             forecast_values = [float(x) for x in forecast.tolist()]
             
-            y_pred = model.predict(X)
+            y_pred = model.predict(X_scaled)
             metrics = ForecastService.calculate_metrics(y, y_pred)
             
-            formula = f"y = {model.intercept_:.4f} + {model.coef_[0]:.4f}·x (Ridge)"
+            formula = f"y = {model.intercept_:.4f} + {model.coef_[0]:.4f}·t (Ridge)"
             
             return {
                 'success': True,
@@ -178,17 +161,22 @@ class ForecastService:
             X = np.arange(len(clean_series)).reshape(-1, 1)
             y = np.array(clean_series)
             
+            # Стандартизация для Lasso
+            scaler = StandardScaler()
+            X_scaled = scaler.fit_transform(X)
+            
             model = Lasso(alpha=alpha)
-            model.fit(X, y)
+            model.fit(X_scaled, y)
             
             future_X = np.arange(len(clean_series), len(clean_series) + steps).reshape(-1, 1)
-            forecast = model.predict(future_X)
+            future_X_scaled = scaler.transform(future_X)
+            forecast = model.predict(future_X_scaled)
             forecast_values = [float(x) for x in forecast.tolist()]
             
-            y_pred = model.predict(X)
+            y_pred = model.predict(X_scaled)
             metrics = ForecastService.calculate_metrics(y, y_pred)
             
-            formula = f"y = {model.intercept_:.4f} + {model.coef_[0]:.4f}·x (Lasso)"
+            formula = f"y = {model.intercept_:.4f} + {model.coef_[0]:.4f}·t (Lasso)"
             
             return {
                 'success': True,
@@ -214,53 +202,32 @@ class ForecastService:
             if len(clean_series) < degree + 1:
                 return {'error': f'Недостаточно чистых данных: {len(clean_series)} точек, нужно {degree+1}', 'forecast': []}
             
-            # Создаем временные метки (годы относительно начала)
             X = np.arange(len(clean_series)).reshape(-1, 1)
             y = np.array(clean_series)
             
-            # Создаем полиномиальные признаки
-            poly = PolynomialFeatures(degree=degree, include_bias=False)
+            poly = PolynomialFeatures(degree=degree)
             X_poly = poly.fit_transform(X)
             
-            # Обучаем модель
             model = LinearRegression()
             model.fit(X_poly, y)
             
-            # Прогноз
             future_X = np.arange(len(clean_series), len(clean_series) + steps).reshape(-1, 1)
             future_X_poly = poly.transform(future_X)
             forecast = model.predict(future_X_poly)
             forecast_values = [float(x) for x in forecast.tolist()]
             
-            # Предсказания на обучающих данных
             y_pred = model.predict(X_poly)
             metrics = ForecastService.calculate_metrics(y, y_pred)
             
-            # Формируем формулу полинома с правильными коэффициентами
-            # Получаем названия признаков
-            feature_names = poly.get_feature_names_out(['x'])
-            
-            # Собираем формулу
+            coefficients = model.coef_
             formula = f"y = {model.intercept_:.4f}"
-            for i, (name, coef) in enumerate(zip(feature_names, model.coef_)):
-                if abs(coef) > 1e-10:  # Игнорируем очень маленькие коэффициенты
-                    sign = '+' if coef > 0 else '-'
-                    abs_coef = abs(coef)
-                    
-                    if '^' in name:
-                        power = name.split('^')[1]
-                        if abs_coef == 1:
-                            formula += f" {sign} x^{power}"
-                        else:
-                            formula += f" {sign} {abs_coef:.4f}·x^{power}"
-                    else:
-                        if abs_coef == 1:
-                            formula += f" {sign} x"
-                        else:
-                            formula += f" {sign} {abs_coef:.4f}·x"
-            
-            # Получаем коэффициенты для отображения
-            coefficients = model.coef_.tolist()
+            for i, coef in enumerate(coefficients):
+                if i == 0:
+                    formula += f" + {coef:.4f}·t"
+                elif i == 1:
+                    formula += f" + {coef:.4f}·t²"
+                else:
+                    formula += f" + {coef:.4f}·t^{i+1}"
             
             return {
                 'success': True,
@@ -268,20 +235,64 @@ class ForecastService:
                 'forecast': forecast_values,
                 'metrics': metrics,
                 'intercept': float(model.intercept_),
-                'coefficients': coefficients,
+                'coefficients': [float(c) for c in coefficients],
                 'degree': degree,
-                'formula': formula,
-                'feature_names': feature_names.tolist()
+                'formula': formula
             }
         except Exception as e:
-            print(f"Error in polynomial forecast: {e}")
-            import traceback
-            traceback.print_exc()
             return {'error': str(e), 'forecast': []}
-
+    
+    @staticmethod
+    def find_best_model(series: List[float], steps: int = 5) -> Dict[str, Any]:
+        """Находит лучшую модель для прогнозирования (по R²)"""
+        if len(series) < 3:
+            return {'success': False, 'error': f'Недостаточно данных: {len(series)} точек', 'forecast': []}
+        
+        clean_series = [float(x) for x in series if x is not None and not np.isnan(x)]
+        if len(clean_series) < 3:
+            return {'success': False, 'error': f'Недостаточно чистых данных: {len(clean_series)} точек', 'forecast': []}
+        
+        models = []
+        
+        linear_result = ForecastService.forecast_linear(clean_series, steps)
+        if linear_result.get('success'):
+            models.append(('Линейная регрессия', linear_result))
+        
+        ridge_result = ForecastService.forecast_ridge(clean_series, steps)
+        if ridge_result.get('success'):
+            models.append(('Ridge регрессия', ridge_result))
+        
+        lasso_result = ForecastService.forecast_lasso(clean_series, steps)
+        if lasso_result.get('success'):
+            models.append(('Lasso регрессия', lasso_result))
+        
+        for degree in [2, 3]:
+            if len(clean_series) >= degree + 1:
+                poly_result = ForecastService.forecast_polynomial(clean_series, steps, degree)
+                if poly_result.get('success'):
+                    models.append((f'Полином степени {degree}', poly_result))
+        
+        if not models:
+            return {'success': False, 'error': 'Не удалось построить ни одну модель', 'forecast': []}
+        
+        # Выбираем модель с наивысшим R²
+        best_model_name, best_model = max(models, key=lambda x: x[1].get('metrics', {}).get('r2', -float('inf')))
+        
+        return {
+            'success': True,
+            'best_model': best_model_name,
+            'forecast': best_model['forecast'],
+            'metrics': best_model.get('metrics', {}),
+            'formula': best_model.get('formula', ''),
+            'intercept': best_model.get('intercept'),
+            'slope': best_model.get('slope'),
+            'coefficients': best_model.get('coefficients'),
+            'degree': best_model.get('degree')
+        }
+    
     @staticmethod
     def forecast_with_model(series: List[float], steps: int = 5, 
-                        model_type: str = 'linear', degree: int = 2) -> Dict[str, Any]:
+                           model_type: str = 'linear', degree: int = 2) -> Dict[str, Any]:
         """Прогнозирование с выбранной моделью"""
         clean_series = [float(x) for x in series if x is not None and not np.isnan(x)]
         
@@ -292,21 +303,21 @@ class ForecastService:
         elif model_type == 'lasso':
             return ForecastService.forecast_lasso(clean_series, steps)
         elif model_type == 'polynomial':
-            return ForecastService.forecast_polynomial_manual(clean_series, steps, degree)  # Используем ручной метод
+            return ForecastService.forecast_polynomial(clean_series, steps, degree)
         elif model_type == 'auto':
             return ForecastService.find_best_model(clean_series, steps)
         else:
             return ForecastService.forecast_linear(clean_series, steps)
-
+    
     @staticmethod
     @with_db_connection
     def get_forecast_for_country(conn, country_id: int, indicator_type: str, 
-                                steps: int = 5, model_type: str = 'auto',
-                                degree: int = 2) -> Dict[str, Any]:
+                                    steps: int = 5, model_type: str = 'auto',
+                                    degree: int = 2) -> Dict[str, Any]:
         """Получение прогноза для страны и показателя"""
         cur = None
         try:
-            print(f"\n=== get_forecast_for_country: country_id={country_id}, indicator={indicator_type} ===")
+            print(f"\n  --- get_forecast_for_country: country_id={country_id}, indicator={indicator_type} ---")
             
             cur = conn.cursor()
             query = f"""
@@ -315,19 +326,25 @@ class ForecastService:
                 WHERE country_id = %s AND {indicator_type} IS NOT NULL
                 ORDER BY year
             """
+            print(f"  Выполняется запрос: {query}")
             cur.execute(query, (country_id,))
             data = cur.fetchall()
             cur.close()
             cur = None
             
-            print(f"Найдено записей: {len(data)}")
+            print(f"  Найдено записей: {len(data)}")
             
-            if len(data) < 3:
-                error_msg = f'Недостаточно данных: {len(data)} точек (нужно минимум 3)'
-                print(f"Ошибка: {error_msg}")
+            if len(data) == 0:
                 return {
                     'success': False,
-                    'error': error_msg,
+                    'error': f'Нет данных для страны {country_id}',
+                    'forecast': []
+                }
+            
+            if len(data) < 3:
+                return {
+                    'success': False,
+                    'error': f'Недостаточно данных: {len(data)} точек (нужно минимум 3)',
                     'forecast': []
                 }
             
@@ -341,21 +358,33 @@ class ForecastService:
             historical_years = []
             for d in data:
                 if d['value'] is not None:
-                    historical_values.append(float(d['value']))
-                    historical_years.append(int(d['year']))
+                    try:
+                        val = float(d['value'])
+                        historical_values.append(val)
+                        historical_years.append(int(d['year']))
+                    except (ValueError, TypeError) as e:
+                        print(f"  Ошибка преобразования: {e}, значение={d['value']}")
+                        continue
             
-            print(f"Исторических значений: {len(historical_values)}, годы: {historical_years[0] if historical_years else 'N/A'} - {historical_years[-1] if historical_years else 'N/A'}")
+            print(f"  Исторических значений: {len(historical_values)}")
+            print(f"  Годы: {historical_years[0] if historical_years else 'N/A'} - {historical_years[-1] if historical_years else 'N/A'}")
             
             if len(historical_values) < 3:
-                error_msg = f'Недостаточно валидных данных: {len(historical_values)} точек'
-                print(f"Ошибка: {error_msg}")
                 return {
                     'success': False,
-                    'error': error_msg,
+                    'error': f'Недостаточно валидных данных: {len(historical_values)} точек',
                     'forecast': []
                 }
             
             forecast_result = ForecastService.forecast_with_model(historical_values, steps, model_type, degree)
+            
+            # Проверка что forecast_result не None и имеет метод get
+            if forecast_result is None:
+                return {
+                    'success': False,
+                    'error': 'Ошибка: модель вернула None',
+                    'forecast': []
+                }
             
             if forecast_result.get('success'):
                 last_year = historical_years[-1]
@@ -376,7 +405,7 @@ class ForecastService:
                     'historical_years': historical_years,
                     'historical_values': historical_values,
                     'forecast_years': forecast_years,
-                    'forecast': forecast_result['forecast'],
+                    'forecast': forecast_result.get('forecast', []),
                     'model_type': forecast_result.get('model_type', model_type),
                     'metrics': forecast_result.get('metrics', {}),
                     'formula': forecast_result.get('formula', '')
@@ -393,92 +422,22 @@ class ForecastService:
                 if 'alpha' in forecast_result:
                     result['alpha'] = forecast_result['alpha']
                 
-                print(f"Прогноз успешно построен")
+                print(f"  Прогноз успешно построен")
                 return ForecastService.convert_to_serializable_dict(result)
             else:
-                print(f"Ошибка прогнозирования: {forecast_result.get('error')}")
+                error_msg = forecast_result.get('error', 'Ошибка прогнозирования') if forecast_result else 'Неизвестная ошибка'
+                print(f"  Ошибка прогнозирования: {error_msg}")
                 return {
                     'success': False,
-                    'error': forecast_result.get('error', 'Ошибка прогнозирования'),
+                    'error': error_msg,
                     'forecast': []
                 }
             
         except Exception as e:
-            print(f"Исключение: {e}")
+            print(f"  Исключение: {e}")
             import traceback
             traceback.print_exc()
             return {'success': False, 'error': str(e), 'forecast': []}
         finally:
             if cur:
                 cur.close()
-
-
-    @staticmethod
-    def forecast_polynomial_manual(series: List[float], steps: int = 5, degree: int = 2) -> Dict[str, Any]:
-        """Прогнозирование с помощью полиномиальной регрессии (ручное построение)"""
-        if len(series) < degree + 1:
-            return {'error': f'Недостаточно данных для полинома степени {degree} (нужно минимум {degree+1} точек)', 'forecast': []}
-        
-        try:
-            clean_series = [float(x) for x in series if x is not None and not np.isnan(x)]
-            if len(clean_series) < degree + 1:
-                return {'error': f'Недостаточно чистых данных: {len(clean_series)} точек, нужно {degree+1}', 'forecast': []}
-            
-            # Создаем временные метки
-            X = np.arange(len(clean_series))
-            y = np.array(clean_series)
-            
-            # Ручное построение полиномиальных признаков
-            X_poly = np.column_stack([X ** i for i in range(1, degree + 1)])
-            
-            # Добавляем столбец единиц для intercept
-            X_with_intercept = np.column_stack([np.ones(len(X)), X_poly])
-            
-            # Решаем методом наименьших квадратов
-            coefficients = np.linalg.lstsq(X_with_intercept, y, rcond=None)[0]
-            
-            intercept = coefficients[0]
-            poly_coeffs = coefficients[1:]
-            
-            # Функция предсказания
-            def predict(x_vals):
-                x_vals = np.array(x_vals)
-                result = intercept
-                for power, coeff in enumerate(poly_coeffs, 1):
-                    result += coeff * (x_vals ** power)
-                return result
-            
-            # Прогноз
-            future_X = np.arange(len(clean_series), len(clean_series) + steps)
-            forecast_values = predict(future_X).tolist()
-            
-            # Предсказания на обучающих данных
-            y_pred = predict(X)
-            metrics = ForecastService.calculate_metrics(y, y_pred)
-            
-            # Формируем формулу
-            formula = f"y = {intercept:.4f}"
-            for power, coeff in enumerate(poly_coeffs, 1):
-                if abs(coeff) > 1e-10:
-                    sign = '+' if coeff > 0 else '-'
-                    abs_coeff = abs(coeff)
-                    if power == 1:
-                        formula += f" {sign} {abs_coeff:.4f}·x"
-                    else:
-                        formula += f" {sign} {abs_coeff:.4f}·x^{power}"
-            
-            return {
-                'success': True,
-                'model_type': f'Polynomial Regression (degree {degree})',
-                'forecast': [float(x) for x in forecast_values],
-                'metrics': metrics,
-                'intercept': float(intercept),
-                'coefficients': [float(c) for c in poly_coeffs],
-                'degree': degree,
-                'formula': formula
-            }
-        except Exception as e:
-            print(f"Error in polynomial forecast: {e}")
-            import traceback
-            traceback.print_exc()
-            return {'error': str(e), 'forecast': []}
