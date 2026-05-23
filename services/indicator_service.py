@@ -35,23 +35,9 @@ class IndicatorService:
         try:
             cur.execute(query, params)
             data = cur.fetchall()
+            return [dict(row) for row in data]
         finally:
             cur.close()
-        
-        result = []
-        for row in data:
-            item = {
-                'id': row['id'],
-                'country_id': row['country_id'],
-                'country_name': row['country_name'],
-                'year': row['year'],
-                'export_value': float(row['export_value']) if row['export_value'] else None,
-                'import_value': float(row['import_value']) if row['import_value'] else None,
-                'gdp_value': float(row['gdp_value']) if row['gdp_value'] else None
-            }
-            result.append(item)
-        
-        return result
     
     @staticmethod
     @with_db_connection
@@ -69,19 +55,9 @@ class IndicatorService:
                 FROM indicators WHERE country_id = %s
             """, (country_id,))
             stats = cur.fetchone()
+            return dict(stats) if stats else None
         finally:
             cur.close()
-        
-        if stats and stats['years_count'] > 0:
-            return {
-                'years_count': stats['years_count'],
-                'min_year': stats['min_year'],
-                'max_year': stats['max_year'],
-                'avg_export': float(stats['avg_export']) if stats['avg_export'] else None,
-                'avg_import': float(stats['avg_import']) if stats['avg_import'] else None,
-                'avg_gdp': float(stats['avg_gdp']) if stats['avg_gdp'] else None
-            }
-        return None
     
     @staticmethod
     @with_db_connection
@@ -110,7 +86,7 @@ class IndicatorService:
     @staticmethod
     @with_db_connection
     def delete_indicator(conn, indicator_id: int) -> Tuple[bool, str]:
-        """Удаление показателя по ID"""
+        """Удаление одного показателя по ID"""
         cur = conn.cursor()
         try:
             cur.execute("DELETE FROM indicators WHERE id = %s RETURNING id", (indicator_id,))
@@ -131,7 +107,7 @@ class IndicatorService:
         """Удаление всех показателей страны"""
         cur = conn.cursor()
         try:
-            cur.execute("DELETE FROM indicators WHERE country_id = %s RETURNING id", (country_id,))
+            cur.execute("DELETE FROM indicators WHERE country_id = %s", (country_id,))
             deleted_count = cur.rowcount
             conn.commit()
             return True, f"Удалено {deleted_count} показателей"

@@ -1,5 +1,5 @@
 from typing import Optional, Tuple, List, Dict, Any
-from database import with_db_connection, Database
+from database import with_db_connection
 from models.country import Country
 from utils.validators import Validators
 
@@ -42,15 +42,27 @@ class CountryService:
     @staticmethod
     @with_db_connection
     def delete_country(conn, country_id: int) -> Tuple[bool, str]:
-        """Удаление страны (каскадно удалятся все показатели)"""
+        """
+        Удаление страны и всех её показателей (каскадное удаление)
+        """
         cur = conn.cursor()
         try:
+            # Проверяем существование страны
+            cur.execute("SELECT id, name FROM countries WHERE id = %s", (country_id,))
+            country = cur.fetchone()
+            
+            if not country:
+                return False, "Страна не найдена"
+            
+            # Удаляем страну (показатели удалятся каскадно из-за ON DELETE CASCADE)
             cur.execute("DELETE FROM countries WHERE id = %s RETURNING id", (country_id,))
             deleted = cur.fetchone()
             conn.commit()
+            
             if deleted:
-                return True, "Страна успешно удалена"
-            return False, "Страна не найдена"
+                return True, f"Страна '{country['name']}' успешно удалена вместе со всеми показателями"
+            return False, "Ошибка при удалении"
+            
         except Exception as e:
             conn.rollback()
             return False, f"Ошибка при удалении: {str(e)}"

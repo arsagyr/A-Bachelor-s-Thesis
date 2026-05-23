@@ -1,26 +1,22 @@
 from flask import Blueprint, request, jsonify, send_file
-from services.indicator_service import IndicatorService
-from services.csv_import_service import CSVImportService
-from services.forecast_service import ForecastService
-from services.regression_service import RegressionService
-from services.clustering_service import ClusteringService
-from services.country_service import CountryService
+from services import IndicatorService
+from services import CSVImportService
+from services import CountryService
+from services import ForecastService
+from calculations.auto_regression import (
+    auto_regression_forecast,
+    auto_regression_with_confidence,
+    compare_auto_regression_models,
+    AVAILABLE_MODELS
+)
 import pandas as pd
 import io
 import json
-import traceback
 
 indicators_bp = Blueprint('indicators', __name__)
 
 
-@indicators_bp.route('/api/countries', methods=['GET'])
-def get_countries():
-    try:
-        countries = CountryService.get_all_countries()
-        return jsonify(countries)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
+# ==================== ЭНДПОИНТЫ ====================
 
 @indicators_bp.route('/api/indicators/filter', methods=['GET'])
 def filter_indicators():
@@ -43,6 +39,15 @@ def get_stats(country_id):
     try:
         stats = IndicatorService.get_country_stats(country_id)
         return jsonify(stats or {})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@indicators_bp.route('/api/countries', methods=['GET'])
+def get_countries():
+    try:
+        countries = CountryService.get_all_countries()
+        return jsonify(countries)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -84,152 +89,89 @@ def download_template():
         return jsonify({'error': str(e)}), 500
 
 
-@indicators_bp.route('/api/forecast/<int:country_id>/<indicator>', methods=['GET'])
-def get_forecast(country_id, indicator):
+# ==================== АВТОРЕГРЕССИЯ ====================
+
+
+@indicators_bp.route('/api/auto-regression/<int:country_id>/<indicator>', methods=['GET'])
+def get_auto_regression_forecast(country_id, indicator):
+    """
+    Авторегрессионный прогноз для показателя
+    """
     try:
         steps = request.args.get('steps', 5, type=int)
         steps = min(steps, 10)
-        model_type = request.args.get('model', 'auto')
+        
+        model_type = request.args.get('model', 'linear')
         degree = request.args.get('degree', 2, type=int)
-        
-        print(f"\n=== Прогноз для страны {country_id}, показатель {indicator} ===")
-        print(f"  steps={steps}, model={model_type}, degree={degree}")
-        
-        if model_type == 'polynomial' and degree < 2:
-            degree = 2
-        if model_type == 'polynomial' and degree > 5:
-            degree = 5
+        show_confidence = request.args.get('confidence', 'false').lower() == 'true'
         
         if indicator not in ['export', 'import', 'gdp']:
-            print(f"  Ошибка: неверный показатель {indicator}")
             return jsonify({'error': 'Неверный тип показателя'}), 400
         
-        result = ForecastService.get_forecast_for_country(
-            country_id, f'{indicator}_value', steps, model_type, degree
+        # Вызываем сервис (он сам получит данные из БД)
+        result = ForecastService.get_auto_regression_forecast(
+            country_id, indicator, steps, model_type, degree, show_confidence
         )
-        
-        print(f"  Результат: success={result.get('success')}")
-        if not result.get('success'):
-            print(f"  Ошибка: {result.get('error')}")
-        
-        return jsonify(result) if result.get('success') else jsonify({'error': result.get('error')}), 400
-    except Exception as e:
-        print(f"  Исключение: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-
-@indicators_bp.route('/api/forecast/models', methods=['GET'])
-def get_forecast_models():
-    return jsonify({'models': ForecastService.AVAILABLE_MODELS})
-
-
-@indicators_bp.route('/api/regression/country/<int:country_id>', methods=['GET'])
-def regression_analysis(country_id):
-    try:
-        model_type = request.args.get('model', 'linear')
-        result = RegressionService.analyze_country(country_id, model_type)
-        return jsonify(result) if result.get('success') else jsonify({'error': result.get('error')}), 400
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@indicators_bp.route('/api/regression/predict', methods=['POST'])
-def predict_gdp():
-    try:
-        data = request.json
-        result = RegressionService.predict_gdp(
-            data.get('country_id'), data.get('export_value'), data.get('import_value'), data.get('model_type', 'linear')
-        )
-        return jsonify(result) if result.get('success') else jsonify({'error': result.get('error')}), 400
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@indicators_bp.route('/api/regression/models', methods=['GET'])
-def get_regression_models():
-    return jsonify({'models': RegressionService.AVAILABLE_MODELS})
-
-
-@indicators_bp.route('/api/clustering/analyze', methods=['GET'])
-def analyze_clusters():
-    try:
-        year = request.args.get('year', type=int)
-        result = ClusteringService.analyze_country_clusters(year)
-        return jsonify(result) if result.get('success') else jsonify({'error': result.get('error')}), 400
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@indicators_bp.route('/api/clustering/statistics', methods=['GET'])
-def get_cluster_statistics():
-    try:
-        year = request.args.get('year', type=int)
-        result = ClusteringService.get_cluster_statistics(year)
-        return jsonify(result) if result.get('success') else jsonify({'error': result.get('error')}), 400
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@indicators_bp.route('/api/clustering/available-years', methods=['GET'])
-def get_available_years_for_clustering():
-    try:
-        years = IndicatorService.get_available_years()
-        return jsonify({'years': years})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-# Эндпоинты для удаления
-@indicators_bp.route('/api/indicators/<int:indicator_id>', methods=['DELETE'])
-def delete_indicator(indicator_id):
-    try:
-        success, message = IndicatorService.delete_indicator(indicator_id)
-        if success:
-            return jsonify({'message': message})
-        return jsonify({'error': message}), 404
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@indicators_bp.route('/api/indicators/country/<int:country_id>', methods=['DELETE'])
-def delete_country_indicators(country_id):
-    try:
-        success, message = IndicatorService.delete_indicators_by_country(country_id)
-        if success:
-            return jsonify({'message': message})
-        return jsonify({'error': message}), 404
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-    
-@indicators_bp.route('/api/forecast/gdp-from-trade/<int:country_id>', methods=['GET'])
-def forecast_gdp_from_trade(country_id):
-    """
-    Прогнозирование ВВП на основе прогнозов экспорта и импорта
-    """
-    try:
-        steps = request.args.get('steps', 5, type=int)
-        steps = min(steps, 10)
-        
-        model_type = request.args.get('model', 'linear')
-        
-        if model_type not in ['linear', 'ridge', 'lasso', 'polynomial']:
-            model_type = 'linear'
-        
-        print(f"=== Прогноз ВВП для страны {country_id}, steps={steps}, model={model_type} ===")
-        
-        result = RegressionService.forecast_gdp_from_trade(country_id, steps, model_type)
         
         if result.get('success'):
             return jsonify(result)
         else:
-            error_msg = result.get('error', 'Ошибка прогнозирования')
-            print(f"Ошибка: {error_msg}")
-            return jsonify({'error': error_msg}), 400
-            
+            return jsonify({'error': result.get('error', 'Ошибка прогнозирования')}), 400
+        
     except Exception as e:
-        print(f"Исключение: {e}")
+        print(f"Error: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+@indicators_bp.route('/api/auto-regression/models', methods=['GET'])
+def get_auto_regression_models():
+    """Получение списка доступных моделей авторегрессии"""
+    return jsonify({
+        'models': AVAILABLE_MODELS,
+        'default': 'linear'
+    })
+
+
+@indicators_bp.route('/api/auto-regression/compare/<int:country_id>/<indicator>', methods=['GET'])
+def compare_auto_regression(country_id, indicator):
+    """Сравнение всех моделей авторегрессии для показателя"""
+    try:
+        steps = request.args.get('steps', 5, type=int)
+        steps = min(steps, 10)
+        
+        if indicator not in ['export', 'import', 'gdp']:
+            return jsonify({'error': 'Неверный тип показателя'}), 400
+        
+        data = IndicatorService.filter_indicators(country_id=country_id)
+        
+        if len(data) < 3:
+            return jsonify({'error': f'Недостаточно данных: {len(data)} точек'}), 400
+        
+        countries = CountryService.get_all_countries()
+        country = next((c for c in countries if c['id'] == country_id), None)
+        
+        if not country:
+            return jsonify({'error': 'Страна не найдена'}), 404
+        
+        series = []
+        years = []
+        for row in sorted(data, key=lambda x: x['year']):
+            val = row.get(f'{indicator}_value')
+            if val is not None:
+                series.append(float(val))
+                years.append(row['year'])
+        
+        result = compare_auto_regression_models(series, steps)
+        result['country_name'] = country['name']
+        result['indicator'] = indicator
+        result['indicator_name'] = {'export': 'Экспорт', 'import': 'Импорт', 'gdp': 'ВВП'}.get(indicator, indicator)
+        result['years'] = years
+        result['historical'] = series
+        result['forecast_years'] = [years[-1] + i + 1 for i in range(steps)]
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
