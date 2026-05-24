@@ -41,3 +41,7 @@ economic_dashboard/
 └── templates/
     ├── index.html
     └── trends.html
+
+
+
+ 

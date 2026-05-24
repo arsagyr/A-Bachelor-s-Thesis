@@ -3,11 +3,15 @@ from services.indicator_service import IndicatorService
 from services.csv_import_service import CSVImportService
 from services.forecast_service import ForecastService
 from services.trend_service import TrendService
+from services.clustering_service import ClusteringService
+from services.regression_service import RegressionService
 
 __all__ = [
     'CountryService',
     'IndicatorService',
     'CSVImportService',
     'ForecastService',
-    'TrendService'
+    'TrendService',
+    'ClusteringService',
+    'RegressionService'
 ]

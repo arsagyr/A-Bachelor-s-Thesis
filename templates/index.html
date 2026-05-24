@@ -54,6 +54,7 @@
                 </div>
             </div>
             
+            <!-- Прогнозирование временных рядов -->
             <div class="forecast-section" id="forecastSection" style="display:none;">
                 <h3>📈 Прогнозирование временных рядов</h3>
                 <div class="forecast-controls">
@@ -66,18 +67,37 @@
                         </select>
                     </div>
                     <div class="control-group">
-                        <label>🤖 Модель</label>
+                        <label>🤖 Модель прогнозирования</label>
                         <select id="forecastModel">
-                            <option value="auto">Автоматический выбор</option>
-                            <option value="linear">Линейная</option>
+                            <option value="auto">🤖 Автоматический выбор (рекомендуется)</option>
+                            <option value="linear">📈 Линейная регрессия</option>
+                            <option value="polynomial">📊 Полиномиальная (степень 2)</option>
+                            <option value="exponential">📉 Экспоненциальная</option>
+                            <option value="ridge">🎯 Ridge регрессия (L2)</option>
+                            <option value="lasso">⚡ Lasso регрессия (L1)</option>
                         </select>
                     </div>
                     <div class="control-group" id="degreeControl" style="display:none;">
                         <label>🔢 Степень полинома</label>
-                        <select id="forecastDegree"><option value="2">2</option><option value="3">3</option></select>
+                        <select id="forecastDegree">
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="5">5</option>
+                        </select>
+                    </div>
+                    <div class="control-group" id="alphaControl" style="display:none;">
+                        <label>α (alpha) регуляризация</label>
+                        <select id="forecastAlpha">
+                            <option value="0.1">0.1</option>
+                            <option value="0.5">0.5</option>
+                            <option value="1.0" selected>1.0</option>
+                            <option value="2.0">2.0</option>
+                            <option value="5.0">5.0</option>
+                        </select>
                     </div>
                     <div class="control-group">
-                        <label>🔮 Горизонт</label>
+                        <label>🔮 Горизонт прогноза</label>
                         <select id="forecastSteps">
                             <option value="3">3 года</option>
                             <option value="5" selected>5 лет</option>
@@ -94,59 +114,101 @@
                 <div id="forecastResult" style="display:none;">
                     <div id="forecastMetrics" class="forecast-metrics"></div>
                     <div id="forecastFormula" class="formula-box"></div>
-                    <div class="forecast-chart-container"><canvas id="forecastChart"></canvas></div>
+                    <div class="forecast-chart-container">
+                        <canvas id="forecastChart"></canvas>
+                    </div>
                     <div id="forecastTable" class="forecast-table"></div>
                 </div>
             </div>
 
+           <!-- Регрессионный прогноз ВВП -->
+            <div class="regression-section" id="regressionSection" style="display:none;">
+                <h3>📊 Прогноз ВВП на основе экспорта и импорта</h3>
+                <div class="regression-controls">
+                    <div class="control-group">
+                        <label>📈 Модель регрессии</label>
+                        <select id="regressionModelType">
+                            <option value="linear">Линейная регрессия</option>
+                            <option value="ridge">Ridge регрессия (L2)</option>
+                            <option value="lasso">Lasso регрессия (L1)</option>
+                        </select>
+                    </div>
+                    <div class="control-group" id="regressionAlphaControl" style="display:none;">
+                        <label>α (alpha) регуляризация</label>
+                        <select id="regressionAlpha">
+                            <option value="0.1">0.1</option>
+                            <option value="0.5">0.5</option>
+                            <option value="1.0" selected>1.0</option>
+                            <option value="2.0">2.0</option>
+                            <option value="5.0">5.0</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>🔮 Горизонт прогноза</label>
+                        <select id="regressionSteps">
+                            <option value="3">3 года</option>
+                            <option value="5" selected>5 лет</option>
+                            <option value="7">7 лет</option>
+                            <option value="10">10 лет</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>&nbsp;</label>
+                        <button onclick="loadGDPRegressionForecast()" class="btn-primary" style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);">📊 Прогноз ВВП</button>
+                    </div>
+                </div>
+                
+                <div id="regressionForecastResult" style="display:none;">
+                    <div id="regressionForecastMetrics" class="forecast-metrics"></div>
+                    <div id="regressionForecastFormula" class="formula-box"></div>
+                    <div class="forecast-chart-container">
+                        <canvas id="regressionForecastChart"></canvas>
+                    </div>
+                    <div id="regressionForecastTable" class="forecast-table"></div>
+                </div>
+            </div>
 
 
-<!-- Кластеризация стран - добавить после секции прогнозирования -->
-<div class="clustering-section" id="clusteringSection">
-    <h3>🏆 Кластеризация стран по экономическим показателям</h3>
-    <div class="clustering-controls">
-        <div class="control-group">
-            <label>📅 Год для анализа</label>
-            <select id="clusteringYear">
-                <option value="">Последний доступный год</option>
-            </select>
-        </div>
-        <div class="control-group">
-            <label>&nbsp;</label>
-            <button onclick="runClustering()" class="btn-primary" style="background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);">🔍 Провести кластеризацию</button>
-        </div>
-    </div>
-    
-    <div id="clusteringResult" style="display:none;">
-        <!-- Метод локтя -->
-        <div class="elbow-container">
-            <h4>📊 Определение оптимального количества кластеров (метод локтя)</h4>
-            <canvas id="elbowChart"></canvas>
-        </div>
-        
-        <!-- Статистика кластеров -->
-        <div id="clusterStats" class="cluster-stats"></div>
-        
-        <!-- Результаты кластеризации -->
-        <div class="cluster-results">
-            <h4>📋 Распределение стран по кластерам</h4>
-            <div id="clusterCountries" class="cluster-countries"></div>
-        </div>
-        
-        <!-- График кластеров -->
-        <div class="cluster-visualization">
-            <h4>📈 Визуализация кластеров (ВВП vs Экспорт)</h4>
-            <canvas id="clusterChart"></canvas>
-        </div>
-    </div>
-</div>
+            <!-- Кластеризация стран - добавить после секции прогнозирования -->
+            <div class="clustering-section" id="clusteringSection">
+                <h3>🏆 Кластеризация стран по экономическим показателям</h3>
+                <div class="clustering-controls">
+                    <div class="control-group">
+                        <label>📅 Год для анализа</label>
+                        <select id="clusteringYear">
+                            <option value="">Последний доступный год</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>&nbsp;</label>
+                        <button onclick="runClustering()" class="btn-primary" style="background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);">🔍 Провести кластеризацию</button>
+                    </div>
+                </div>
+                
+                <div id="clusteringResult" style="display:none;">
+                    <!-- Метод локтя -->
+                    <div class="elbow-container">
+                        <h4>📊 Определение оптимального количества кластеров (метод локтя)</h4>
+                        <canvas id="elbowChart"></canvas>
+                    </div>
+                    
+                    <!-- Статистика кластеров -->
+                    <div id="clusterStats" class="cluster-stats"></div>
+                    
+                    <!-- Результаты кластеризации -->
+                    <div class="cluster-results">
+                        <h4>📋 Распределение стран по кластерам</h4>
+                        <div id="clusterCountries" class="cluster-countries"></div>
+                    </div>
+                    
+                    <!-- График кластеров -->
+                    <div class="cluster-visualization">
+                        <h4>📈 Визуализация кластеров (ВВП vs Экспорт)</h4>
+                        <canvas id="clusterChart"></canvas>
+                    </div>
+                </div>
+            </div>
 
-
-
-
-
-
-            
             <div class="csv-import-section">
                 <h3>📁 Импорт данных из CSV/Excel</h3>
                 <div class="import-controls">

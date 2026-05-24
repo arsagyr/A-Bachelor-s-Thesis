@@ -13,18 +13,9 @@ class ClusteringService:
     """Сервис для кластеризации стран"""
     
     @staticmethod
-    def convert_decimal_to_float(value):
-        """Преобразование Decimal в float"""
-        if isinstance(value, Decimal):
-            return float(value)
-        return value
-    
-    @staticmethod
     @with_db_connection
     def analyze_country_clusters(conn, year: Optional[int] = None) -> Dict[str, Any]:
-        """
-        Анализ кластеризации стран
-        """
+        """Анализ кластеризации стран"""
         try:
             cur = conn.cursor()
             
@@ -47,7 +38,6 @@ class ClusteringService:
                 """
                 cur.execute(query, (year,))
             else:
-                # Берем последний доступный год для каждой страны
                 query = """
                     SELECT DISTINCT ON (c.id)
                         c.id as country_id,
@@ -87,30 +77,24 @@ class ClusteringService:
                 })
             
             df = pd.DataFrame(rows)
-            
-            # Фильтруем страны с нулевыми показателями
             df = df[(df['export_value'] > 0) | (df['gdp_value'] > 0)]
             
             if len(df) < 3:
                 return {'success': False, 'error': f'Недостаточно стран после фильтрации: {len(df)}'}
             
-            # Подготовка признаков
             features, feature_names = ClusteringCalc.prepare_features(df)
             
             if len(features) == 0:
                 return {'success': False, 'error': 'Ошибка подготовки признаков'}
             
-            # Определение оптимального количества кластеров
             elbow_result = ClusteringCalc.find_optimal_clusters(features)
             optimal_k = elbow_result.get('optimal_k', 3)
             
-            # Выполнение кластеризации
             clustering_result = ClusteringCalc.perform_clustering(features, optimal_k)
             
             if not clustering_result.get('success'):
                 return {'success': False, 'error': clustering_result.get('error')}
             
-            # Формирование списка стран с кластерами
             countries = []
             for i, row in df.iterrows():
                 label = clustering_result['labels'][i]
@@ -127,14 +111,12 @@ class ClusteringService:
                     'cluster_type': cluster_type,
                     'export_value': float(row['export_value']),
                     'import_value': float(row['import_value']),
-                    'gdp_value': float(row['gdp_value']) 
+                    'gdp_value': float(row['gdp_value'])
                 })
             
-            # Сортировка по типу кластера
             type_order = {'Передовые': 0, 'Средние': 1, 'Отстающие': 2}
             countries.sort(key=lambda x: type_order.get(x['cluster_type'], 3))
             
-            # Добавляем средние значения для кластеров
             for cluster in clustering_result['cluster_info']:
                 cluster_countries = [c for c in countries if c['cluster_type'] == cluster['type']]
                 if cluster_countries:
@@ -142,7 +124,7 @@ class ClusteringService:
                     cluster['avg_export'] = sum(c['export_value'] for c in cluster_countries) / len(cluster_countries)
                     cluster['avg_import'] = sum(c['import_value'] for c in cluster_countries) / len(cluster_countries)
             
-            result = {
+            return {
                 'success': True,
                 'year': year if year else 'последний доступный',
                 'n_countries': len(countries),
@@ -157,8 +139,6 @@ class ClusteringService:
                 'countries': countries,
                 'feature_names': feature_names
             }
-            
-            return result
             
         except Exception as e:
             print(f"Error in analyze_country_clusters: {e}")

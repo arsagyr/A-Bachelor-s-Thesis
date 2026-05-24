@@ -112,7 +112,7 @@ df = pd.DataFrame(df_list)
 df = df.sort_values(['Страна', 'Год']).reset_index(drop=True)
 
 # Сохраняем в CSV
-csv_filename = 'brics_trade_gdp_2000_2023.csv'
+csv_filename = 'table.csv'
 df.to_csv(csv_filename, index=False, encoding='utf-8-sig')
 
 print("\n" + "=" * 60)
