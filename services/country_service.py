@@ -42,29 +42,21 @@ class CountryService:
     @staticmethod
     @with_db_connection
     def delete_country(conn, country_id: int) -> Tuple[bool, str]:
-        """
-        Удаление страны и всех её показателей (каскадное удаление)
-        """
         cur = conn.cursor()
         try:
-            # Проверяем существование страны
             cur.execute("SELECT id, name FROM countries WHERE id = %s", (country_id,))
             country = cur.fetchone()
-            
             if not country:
                 return False, "Страна не найдена"
             
-            # Удаляем страну (показатели удалятся каскадно из-за ON DELETE CASCADE)
             cur.execute("DELETE FROM countries WHERE id = %s RETURNING id", (country_id,))
             deleted = cur.fetchone()
             conn.commit()
-            
             if deleted:
-                return True, f"Страна '{country['name']}' успешно удалена вместе со всеми показателями"
+                return True, f"Страна '{country['name']}' успешно удалена"
             return False, "Ошибка при удалении"
-            
         except Exception as e:
             conn.rollback()
-            return False, f"Ошибка при удалении: {str(e)}"
+            return False, f"Ошибка: {str(e)}"
         finally:
             cur.close()

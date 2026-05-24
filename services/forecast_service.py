@@ -1,95 +1,99 @@
-"""
-Сервис для прогнозирования (API слой)
-"""
-
 from typing import Dict, Any
 from database import with_db_connection
-from calculations.auto_regression import (
-    auto_regression_forecast,
-    auto_regression_with_confidence,
-    compare_auto_regression_models
-)
-from calculations.regression import compare_all_models, forecast_gdp
-from calculations.preprocessing import convert_data_to_float, prepare_regression_features
-import numpy as np
+from calculations.auto_regression import auto_regression_forecast
 
 
 class ForecastService:
-    """Сервис для прогнозирования (преобразует результаты calculations в JSON)"""
-    
-    @staticmethod
-    def _clean_forecast_result(result: Dict[str, Any]) -> Dict[str, Any]:
-        """Удаляет несериализуемые объекты из результата прогноза"""
-        if isinstance(result, dict):
-            # Удаляем объекты моделей
-            for key in ['model', 'scaler', 'poly']:
-                if key in result:
-                    del result[key]
-            
-            # Рекурсивно очищаем вложенные словари
-            for key, value in result.items():
-                if isinstance(value, dict):
-                    ForecastService._clean_forecast_result(value)
-                elif isinstance(value, list):
-                    for item in value:
-                        if isinstance(item, dict):
-                            ForecastService._clean_forecast_result(item)
-        return result
     
     @staticmethod
     @with_db_connection
-    def get_auto_regression_forecast(conn, country_id: int, indicator: str, 
-                                      steps: int = 5, model_type: str = 'linear',
-                                      degree: int = 2, show_confidence: bool = False) -> Dict[str, Any]:
-        """
-        Получение авторегрессионного прогноза
-        """
-        # Получаем данные
-        data = conn.cursor()
-        data.execute(f"""
-            SELECT year, {indicator}_value as value
-            FROM indicators 
-            WHERE country_id = %s AND {indicator}_value IS NOT NULL
-            ORDER BY year
-        """, (country_id,))
-        rows = data.fetchall()
-        data.close()
-        
-        if len(rows) < 3:
-            return {'success': False, 'error': f'Недостаточно данных: {len(rows)} точек'}
-        
-        # Получаем название страны
-        cur = conn.cursor()
-        cur.execute("SELECT name FROM countries WHERE id = %s", (country_id,))
-        country = cur.fetchone()
-        cur.close()
-        
-        # Извлекаем временной ряд
-        series = [float(row['value']) for row in rows]
-        years = [row['year'] for row in rows]
-        
-        # Выполняем прогноз через calculations
-        if model_type == 'compare':
-            result = compare_auto_regression_models(series, steps)
-        elif show_confidence:
-            result = auto_regression_with_confidence(series, steps, model_type, confidence_level=0.95, degree=degree)
-        else:
-            result = auto_regression_forecast(series, steps, model_type, degree=degree)
-        
-        if not result.get('success'):
+    def get_forecast(conn, country_id: int, indicator: str, steps: int = 5, 
+                     model_type: str = 'auto', degree: int = 2) -> Dict[str, Any]:
+        """Получение прогноза для страны (значения в млрд USD)"""
+        cur = None
+        try:
+            cur = conn.cursor()
+            query = f"""
+                SELECT year, {indicator} as value
+                FROM indicators 
+                WHERE country_id = %s AND {indicator} IS NOT NULL
+                ORDER BY year
+            """
+            cur.execute(query, (country_id,))
+            data = cur.fetchall()
+            cur.close()
+            cur = None
+            
+            if len(data) < 3:
+                return {
+                    'success': False,
+                    'error': f'Недостаточно данных: {len(data)} точек',
+                    'forecast': []
+                }
+            
+            cur = conn.cursor()
+            cur.execute("SELECT name FROM countries WHERE id = %s", (country_id,))
+            country = cur.fetchone()
+            cur.close()
+            cur = None
+            
+            historical_values = []
+            historical_years = []
+            for d in data:
+                if d['value'] is not None:
+                    try:
+                        val = float(d['value'])
+                        historical_values.append(val)
+                        historical_years.append(int(d['year']))
+                    except (ValueError, TypeError) as e:
+                        print(f"Ошибка преобразования: {e}")
+                        continue
+            
+            if len(historical_values) < 3:
+                return {
+                    'success': False,
+                    'error': f'Недостаточно валидных данных: {len(historical_values)} точек',
+                    'forecast': []
+                }
+            
+            result = auto_regression_forecast(historical_values, steps, model_type, degree=degree)
+            
+            if result.get('success'):
+                last_year = historical_years[-1]
+                forecast_years = [last_year + i + 1 for i in range(steps)]
+                
+                indicator_names = {
+                    'export_value': 'Экспорт',
+                    'import_value': 'Импорт',
+                    'gdp_value': 'ВВП'
+                }
+                
+                return {
+                    'success': True,
+                    'country_name': country['name'] if country else 'Unknown',
+                    'indicator_name': indicator_names.get(indicator, indicator),
+                    'historical_years': historical_years,
+                    'historical_values': historical_values,
+                    'forecast_years': forecast_years,
+                    'forecast': result['forecast'],
+                    'model_type': result.get('model_type', model_type),
+                    'metrics': {
+                        'r2': result.get('r2', 0),
+                        'rmse': result.get('rmse', 0),
+                        'mae': result.get('mae', 0),
+                        'mape': result.get('mape', 0)
+                    },
+                    'formula': result.get('formula', ''),
+                    'unit': 'млрд USD'
+                }
+            
             return {'success': False, 'error': result.get('error', 'Ошибка прогнозирования')}
-        
-        # Очищаем результат от несериализуемых объектов
-        result = ForecastService._clean_forecast_result(result)
-        
-        # Добавляем метаинформацию
-        result['country_id'] = country_id
-        result['country_name'] = country['name']
-        result['indicator'] = indicator
-        result['indicator_name'] = {'export': 'Экспорт', 'import': 'Импорт', 'gdp': 'ВВП'}.get(indicator, indicator)
-        result['years'] = years
-        result['historical'] = series
-        result['forecast_years'] = [years[-1] + i + 1 for i in range(steps)]
-        result['success'] = True
-        
-        return result
+            
+        except Exception as e:
+            print(f"Исключение: {e}")
+            import traceback
+            traceback.print_exc()
+            return {'success': False, 'error': str(e), 'forecast': []}
+        finally:
+            if cur:
+                cur.close()

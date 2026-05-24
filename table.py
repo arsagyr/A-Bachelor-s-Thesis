@@ -79,11 +79,13 @@ for country_code, country_name in brics_countries.items():
         for year in years:
             value = data.get(year, None)
             if value is not None:
-                # Конвертируем в нужные единицы
+                # Конвертируем в миллиарды для всех показателей
                 if indicator_name == 'GDP':
-                    country_data[f"{year}_GDP_trln"] = value / 1e12  # трлн USD
-                else:  # EXPORT или IMPORT
-                    country_data[f"{year}_{indicator_name}_bln"] = value / 1e9   # млрд USD
+                    country_data[f"{year}_GDP_bln"] = value / 1e9   # млрд USD
+                elif indicator_name == 'EXPORT':
+                    country_data[f"{year}_EXPORT_bln"] = value / 1e9   # млрд USD
+                else:  # IMPORT
+                    country_data[f"{year}_IMPORT_bln"] = value / 1e9   # млрд USD
     
     all_data.append(country_data)
     time.sleep(0.5)  # Небольшая пауза между запросами
@@ -98,9 +100,9 @@ for country in all_data:
         row = {
             'Страна': country_name,
             'Год': year,
-            'ВВП': country.get(f"{year}_GDP_trln", None),
-            'Экспорт': country.get(f"{year}_EXPORT_bln", None),
-            'Импорт': country.get(f"{year}_IMPORT_bln", None)
+            'ВВП_млрд': country.get(f"{year}_GDP_bln", None),
+            'Экспорт_млрд': country.get(f"{year}_EXPORT_bln", None),
+            'Импорт_млрд': country.get(f"{year}_IMPORT_bln", None)
         }
         df_list.append(row)
 
@@ -120,8 +122,8 @@ print(f"🌍 Стран: {len(brics_countries)}")
 print(f"📅 Период: 2000-2023")
 
 # Показываем статистику по полноте данных
-print("\n📊 Статистика по данным:")
-for indicator in ['GDP_trln_USD', 'Export_bln_USD', 'Import_bln_USD']:
+print("\n📊 Статистика по данным (в млрд USD):")
+for indicator in ['ВВП_млрд', 'Экспорт_млрд', 'Импорт_млрд']:
     non_null = df[indicator].notna().sum()
     total = len(df)
     print(f"  - {indicator}: {non_null}/{total} ({non_null/total*100:.1f}%)")
@@ -131,6 +133,16 @@ print("\n🔍 Первые 10 строк данных:")
 print(df.head(10))
 
 # Дополнительно: сводная статистика по 2023 году
-print("\n📋 Данные за 2023 год:")
-df_2023 = df[df['Year'] == 2023]
+print("\n📋 Данные за 2023 год (в млрд USD):")
+df_2023 = df[df['Год'] == 2023]
 print(df_2023.to_string(index=False))
+
+# Дополнительная статистика
+print("\n📈 Сводная статистика за весь период:")
+for country in brics_countries.values():
+    country_data = df[df['Страна'] == country]
+    if not country_data.empty:
+        print(f"\n{country}:")
+        print(f"  Средний ВВП: {country_data['ВВП_млрд'].mean():.2f} млрд USD")
+        print(f"  Средний экспорт: {country_data['Экспорт_млрд'].mean():.2f} млрд USD")
+        print(f"  Средний импорт: {country_data['Импорт_млрд'].mean():.2f} млрд USD")

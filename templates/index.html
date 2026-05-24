@@ -15,13 +15,10 @@
         </div>
         
         <div class="content">
-            <!-- Фильтры -->
             <div class="controls">
                 <div class="control-group">
                     <label>🌍 Выберите страну</label>
-                    <select id="countrySelect">
-                        <option value="">Все страны</option>
-                    </select>
+                    <select id="countrySelect"><option value="">Все страны</option></select>
                 </div>
                 <div class="control-group">
                     <label>📈 Тип показателя</label>
@@ -48,7 +45,6 @@
             
             <div id="statsContainer" class="stats"></div>
             
-            <!-- График динамики -->
             <div class="chart-container">
                 <h3>📈 Динамика экономических показателей</h3>
                 <canvas id="trendChart"></canvas>
@@ -58,13 +54,12 @@
                 </div>
             </div>
             
-            <!-- Авторегрессионный прогноз -->
-            <div class="auto-regression-section" id="autoRegressionSection" style="display:none;">
-                <h3>📈 Авторегрессионный прогноз временных рядов</h3>
-                <div class="auto-regression-controls">
+            <div class="forecast-section" id="forecastSection" style="display:none;">
+                <h3>📈 Прогнозирование временных рядов</h3>
+                <div class="forecast-controls">
                     <div class="control-group">
                         <label>📊 Показатель</label>
-                        <select id="arIndicator">
+                        <select id="forecastIndicator">
                             <option value="export">Экспорт</option>
                             <option value="import">Импорт</option>
                             <option value="gdp">ВВП</option>
@@ -72,25 +67,18 @@
                     </div>
                     <div class="control-group">
                         <label>🤖 Модель</label>
-                        <select id="arModel">
-                            <option value="linear">📈 Линейная</option>
-                            <option value="polynomial">📊 Полиномиальная</option>
-                            <option value="exponential">📉 Экспоненциальная</option>
-                            <option value="ridge">🎯 Ridge</option>
-                            <option value="lasso">⚡ Lasso</option>
-                            <option value="compare">🔍 Сравнить все</option>
+                        <select id="forecastModel">
+                            <option value="auto">Автоматический выбор</option>
+                            <option value="linear">Линейная</option>
                         </select>
                     </div>
-                    <div class="control-group" id="arDegreeGroup" style="display:none;">
+                    <div class="control-group" id="degreeControl" style="display:none;">
                         <label>🔢 Степень полинома</label>
-                        <select id="arDegree">
-                            <option value="2">2</option>
-                            <option value="3">3</option>
-                        </select>
+                        <select id="forecastDegree"><option value="2">2</option><option value="3">3</option></select>
                     </div>
                     <div class="control-group">
                         <label>🔮 Горизонт</label>
-                        <select id="arSteps">
+                        <select id="forecastSteps">
                             <option value="3">3 года</option>
                             <option value="5" selected>5 лет</option>
                             <option value="7">7 лет</option>
@@ -98,29 +86,67 @@
                         </select>
                     </div>
                     <div class="control-group">
-                        <label>📊 Доверительные интервалы</label>
-                        <select id="arConfidence">
-                            <option value="false">Нет</option>
-                            <option value="true">Да (95%)</option>
-                        </select>
-                    </div>
-                    <div class="control-group">
                         <label>&nbsp;</label>
-                        <button onclick="loadAutoRegression()" class="btn-primary">🔮 Построить прогноз</button>
+                        <button onclick="loadForecast()" class="btn-primary">🔮 Построить прогноз</button>
                     </div>
                 </div>
                 
-                <div id="arResult" style="display:none;">
-                    <div id="arMetrics" class="forecast-metrics"></div>
-                    <div class="forecast-chart-container">
-                        <canvas id="arChart"></canvas>
-                    </div>
-                    <div id="arFormula" class="formula-container"></div>
-                    <div id="arTable" class="forecast-table"></div>
+                <div id="forecastResult" style="display:none;">
+                    <div id="forecastMetrics" class="forecast-metrics"></div>
+                    <div id="forecastFormula" class="formula-box"></div>
+                    <div class="forecast-chart-container"><canvas id="forecastChart"></canvas></div>
+                    <div id="forecastTable" class="forecast-table"></div>
                 </div>
             </div>
+
+
+
+<!-- Кластеризация стран - добавить после секции прогнозирования -->
+<div class="clustering-section" id="clusteringSection">
+    <h3>🏆 Кластеризация стран по экономическим показателям</h3>
+    <div class="clustering-controls">
+        <div class="control-group">
+            <label>📅 Год для анализа</label>
+            <select id="clusteringYear">
+                <option value="">Последний доступный год</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label>&nbsp;</label>
+            <button onclick="runClustering()" class="btn-primary" style="background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);">🔍 Провести кластеризацию</button>
+        </div>
+    </div>
+    
+    <div id="clusteringResult" style="display:none;">
+        <!-- Метод локтя -->
+        <div class="elbow-container">
+            <h4>📊 Определение оптимального количества кластеров (метод локтя)</h4>
+            <canvas id="elbowChart"></canvas>
+        </div>
+        
+        <!-- Статистика кластеров -->
+        <div id="clusterStats" class="cluster-stats"></div>
+        
+        <!-- Результаты кластеризации -->
+        <div class="cluster-results">
+            <h4>📋 Распределение стран по кластерам</h4>
+            <div id="clusterCountries" class="cluster-countries"></div>
+        </div>
+        
+        <!-- График кластеров -->
+        <div class="cluster-visualization">
+            <h4>📈 Визуализация кластеров (ВВП vs Экспорт)</h4>
+            <canvas id="clusterChart"></canvas>
+        </div>
+    </div>
+</div>
+
+
+
+
+
+
             
-            <!-- Импорт CSV -->
             <div class="csv-import-section">
                 <h3>📁 Импорт данных из CSV/Excel</h3>
                 <div class="import-controls">
@@ -132,36 +158,28 @@
                 <div id="importResult"></div>
             </div>
             
-            <!-- Управление данными -->
             <div class="data-management-section">
                 <h3>🗑️ Управление данными</h3>
                 <div class="management-controls">
                     <div class="control-group">
                         <label>📊 Удалить показатель</label>
-                        <select id="deleteIndicatorSelect">
-                            <option value="">Выберите показатель</option>
-                        </select>
+                        <select id="deleteIndicatorSelect"><option value="">Выберите показатель</option></select>
                         <button onclick="deleteIndicator()" class="btn-danger">🗑️ Удалить показатель</button>
                     </div>
                     <div class="control-group">
                         <label>🏢 Удалить все показатели страны</label>
-                        <select id="deleteCountryIndicatorsSelect">
-                            <option value="">Выберите страну</option>
-                        </select>
+                        <select id="deleteCountryIndicatorsSelect"><option value="">Выберите страну</option></select>
                         <button onclick="deleteAllIndicators()" class="btn-warning">⚠️ Удалить показатели</button>
                     </div>
                     <div class="control-group">
                         <label>🗑️ Удалить страну</label>
-                        <select id="deleteCountrySelect">
-                            <option value="">Выберите страну</option>
-                        </select>
+                        <select id="deleteCountrySelect"><option value="">Выберите страну</option></select>
                         <button onclick="deleteCountry()" class="btn-danger">🔥 Удалить страну</button>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>

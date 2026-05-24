@@ -14,6 +14,13 @@ def create_app():
     Database.init_pool()
     register_routes(app)
     
+    # Вывод всех маршрутов для отладки
+    print("\n" + "="*50)
+    print("ЗАРЕГИСТРИРОВАННЫЕ МАРШРУТЫ:")
+    for rule in app.url_map.iter_rules():
+        print(f"  {rule}")
+    print("="*50 + "\n")
+    
     return app
 
 

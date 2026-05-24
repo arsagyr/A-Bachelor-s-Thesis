@@ -1,6 +1,5 @@
 from typing import Optional, List, Dict, Any, Tuple
 from database import with_db_connection
-from models.indicator import Indicator
 
 
 class IndicatorService:
@@ -12,7 +11,7 @@ class IndicatorService:
                          end_year: Optional[int] = None,
                          indicator_type: str = 'all') -> List[Dict[str, Any]]:
         query = """
-            SELECT i.id, i.year, i.export_value, i.import_value, i.gdp_value, c.name as country_name, c.id as country_id
+            SELECT i.id, i.year, i.export_value, i.import_value, i.gdp_value, c.name as country_name
             FROM indicators i
             JOIN countries c ON i.country_id = c.id
             WHERE 1=1
@@ -61,32 +60,17 @@ class IndicatorService:
     
     @staticmethod
     @with_db_connection
-    def add_or_update_indicator(conn, country_id: int, year: int,
-                               export_value: Optional[float] = None,
-                               import_value: Optional[float] = None,
-                               gdp_value: Optional[float] = None) -> Tuple[bool, str]:
+    def get_available_years(conn) -> List[int]:
         cur = conn.cursor()
         try:
-            cur.execute("""
-                INSERT INTO indicators (country_id, year, export_value, import_value, gdp_value)
-                VALUES (%s, %s, %s, %s, %s)
-                ON CONFLICT (country_id, year) DO UPDATE SET
-                    export_value = EXCLUDED.export_value,
-                    import_value = EXCLUDED.import_value,
-                    gdp_value = EXCLUDED.gdp_value
-            """, (country_id, year, export_value, import_value, gdp_value))
-            conn.commit()
-            return True, "Успешно сохранено"
-        except Exception as e:
-            conn.rollback()
-            return False, str(e)
+            cur.execute("SELECT DISTINCT year FROM indicators ORDER BY year")
+            return [row['year'] for row in cur.fetchall()]
         finally:
             cur.close()
     
     @staticmethod
     @with_db_connection
     def delete_indicator(conn, indicator_id: int) -> Tuple[bool, str]:
-        """Удаление одного показателя по ID"""
         cur = conn.cursor()
         try:
             cur.execute("DELETE FROM indicators WHERE id = %s RETURNING id", (indicator_id,))
@@ -97,14 +81,13 @@ class IndicatorService:
             return False, "Показатель не найден"
         except Exception as e:
             conn.rollback()
-            return False, f"Ошибка при удалении: {str(e)}"
+            return False, f"Ошибка: {str(e)}"
         finally:
             cur.close()
     
     @staticmethod
     @with_db_connection
     def delete_indicators_by_country(conn, country_id: int) -> Tuple[bool, str]:
-        """Удаление всех показателей страны"""
         cur = conn.cursor()
         try:
             cur.execute("DELETE FROM indicators WHERE country_id = %s", (country_id,))
@@ -113,6 +96,6 @@ class IndicatorService:
             return True, f"Удалено {deleted_count} показателей"
         except Exception as e:
             conn.rollback()
-            return False, f"Ошибка при удалении: {str(e)}"
+            return False, f"Ошибка: {str(e)}"
         finally:
             cur.close()
