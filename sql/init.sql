@@ -1,17 +1,18 @@
--- Таблица стран
-CREATE TABLE IF NOT EXISTS countries (
+CREATE TABLE countries (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL UNIQUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    name VARCHAR(100) NOT NULL UNIQUE
 );
 
--- Таблица показателей
-CREATE TABLE IF NOT EXISTS indicators (
+CREATE TABLE indicators (
     id SERIAL PRIMARY KEY,
-    country_id INTEGER NOT NULL REFERENCES countries(id) ON DELETE CASCADE,
-    year INTEGER NOT NULL,
-    export_value DECIMAL(15, 2),   -- млрд USD
-    import_value DECIMAL(15, 2),
-    gdp_value DECIMAL(15, 2),
-    UNIQUE(country_id, year)
+    name VARCHAR(100) NOT NULL UNIQUE
+);
+
+CREATE TABLE statistics (
+    country_id INT REFERENCES countries(id),
+    year INT NOT NULL,
+    indicator_id INT REFERENCES indicators(id),
+    value NUMERIC(20,2) NOT NULL,
+
+    PRIMARY KEY (country_id, year, indicator_id)
 );

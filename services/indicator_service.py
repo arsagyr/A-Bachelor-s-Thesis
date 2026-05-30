@@ -1,101 +1,144 @@
 from typing import Optional, List, Dict, Any, Tuple
 from database import with_db_connection
+from repositories.indicator_repository import IndicatorRepository
+from repositories.statistics_repository import StatisticsRepository
 
 
 class IndicatorService:
-    
+
     @staticmethod
     @with_db_connection
-    def filter_indicators(conn, country_id: Optional[int] = None,
+    def filter_indicators(conn,
+                         country_id: Optional[int] = None,
                          start_year: Optional[int] = None,
                          end_year: Optional[int] = None,
                          indicator_type: str = 'all') -> List[Dict[str, Any]]:
-        query = """
-            SELECT i.id, i.year, i.export_value, i.import_value, i.gdp_value, c.name as country_name
-            FROM indicators i
-            JOIN countries c ON i.country_id = c.id
-            WHERE 1=1
         """
-        params = []
-        
-        if country_id:
-            query += " AND i.country_id = %s"
-            params.append(country_id)
-        if start_year:
-            query += " AND i.year >= %s"
-            params.append(start_year)
-        if end_year:
-            query += " AND i.year <= %s"
-            params.append(end_year)
-        
-        query += " ORDER BY i.year"
-        
-        cur = conn.cursor()
-        try:
-            cur.execute(query, params)
-            data = cur.fetchall()
-            return [dict(row) for row in data]
-        finally:
-            cur.close()
-    
+        Возвращает список показателей в старом формате:
+        {id, year, export_value, import_value, gdp_value, country_name}
+        id - составной, берём первое попавшееся значение (для совместимости)
+        """
+        stats_repo = StatisticsRepository(conn)
+        ind_repo = IndicatorRepository(conn)
+
+        # Получаем все записи с фильтрацией
+        stats = stats_repo.filter(
+            country_id=country_id,
+            start_year=start_year,
+            end_year=end_year
+        )
+
+        # Получаем mapping indicator_id -> indicator_name
+        indicators = {ind.id: ind.name for ind in ind_repo.get_all()}
+
+        # Группируем по (country_id, year) и создаём словарь
+        from collections import defaultdict
+        grouped = defaultdict(dict)
+        for stat in stats:
+            key = (stat.country_id, stat.year)
+            ind_name = indicators.get(stat.indicator_id)
+            if ind_name in ('export_value', 'import_value', 'gdp_value'):
+                grouped[key][ind_name] = stat.value
+
+        # Получаем названия стран
+        from repositories.country_repository import CountryRepository
+        country_repo = CountryRepository(conn)
+        countries = {c.id: c.name for c in country_repo.get_all()}
+
+        result = []
+        # Генерируем искусственный id (для совместимости)
+        fake_id = 1
+        for (cid, year), values in grouped.items():
+            row = {
+                'id': fake_id,
+                'year': year,
+                'export_value': values.get('export_value'),
+                'import_value': values.get('import_value'),
+                'gdp_value': values.get('gdp_value'),
+                'country_name': countries.get(cid, 'Unknown')
+            }
+            result.append(row)
+            fake_id += 1
+
+        # Сортировка по году
+        result.sort(key=lambda x: x['year'])
+        return result
+
     @staticmethod
     @with_db_connection
     def get_country_stats(conn, country_id: int) -> Optional[Dict[str, Any]]:
-        cur = conn.cursor()
-        try:
-            cur.execute("""
-                SELECT 
-                    COUNT(*) as years_count,
-                    MIN(year) as min_year,
-                    MAX(year) as max_year,
-                    AVG(export_value) as avg_export,
-                    AVG(import_value) as avg_import,
-                    AVG(gdp_value) as avg_gdp
-                FROM indicators WHERE country_id = %s
-            """, (country_id,))
-            stats = cur.fetchone()
-            return dict(stats) if stats else None
-        finally:
-            cur.close()
-    
+        stats_repo = StatisticsRepository(conn)
+        ind_repo = IndicatorRepository(conn)
+
+        # Получаем все записи для страны
+        all_stats = stats_repo.get_by_country(country_id)
+        if not all_stats:
+            return None
+
+        # Определим id нужных индикаторов
+        indicators = {ind.name: ind.id for ind in ind_repo.get_all()}
+        export_id = indicators.get('export_value')
+        import_id = indicators.get('import_value')
+        gdp_id = indicators.get('gdp_value')
+
+        years = set(s.year for s in all_stats)
+
+        # Фильтруем значения по индикаторам
+        export_vals = [s.value for s in all_stats if s.indicator_id == export_id and s.value is not None]
+        import_vals = [s.value for s in all_stats if s.indicator_id == import_id and s.value is not None]
+        gdp_vals = [s.value for s in all_stats if s.indicator_id == gdp_id and s.value is not None]
+
+        def safe_avg(lst):
+            return sum(lst) / len(lst) if lst else None
+
+        return {
+            'years_count': len(years),
+            'min_year': min(years) if years else None,
+            'max_year': max(years) if years else None,
+            'avg_export': safe_avg(export_vals),
+            'avg_import': safe_avg(import_vals),
+            'avg_gdp': safe_avg(gdp_vals)
+        }
+
     @staticmethod
     @with_db_connection
     def get_available_years(conn) -> List[int]:
-        cur = conn.cursor()
-        try:
-            cur.execute("SELECT DISTINCT year FROM indicators ORDER BY year")
-            return [row['year'] for row in cur.fetchall()]
-        finally:
-            cur.close()
-    
+        stats_repo = StatisticsRepository(conn)
+        return stats_repo.get_years()
+
     @staticmethod
     @with_db_connection
     def delete_indicator(conn, indicator_id: int) -> Tuple[bool, str]:
-        cur = conn.cursor()
+        """
+        В новой схеме indicator_id - это id из справочника indicators.
+        Удаляем сам индикатор и все связанные с ним значения (каскадно).
+        """
+        ind_repo = IndicatorRepository(conn)
+        indicator = ind_repo.get_by_id(indicator_id)
+        if not indicator:
+            return False, "Индикатор не найден"
+
         try:
-            cur.execute("DELETE FROM indicators WHERE id = %s RETURNING id", (indicator_id,))
-            deleted = cur.fetchone()
+            # Удаляем все статистики для этого индикатора
+            stats_repo = StatisticsRepository(conn)
+            # В репозитории добавим метод delete_by_indicator
+            stats_repo.delete_by_indicator(indicator_id)  # реализуем ниже
+            # Удаляем справочную запись
+            ind_repo.delete(indicator_id)
             conn.commit()
-            if deleted:
-                return True, "Показатель успешно удален"
-            return False, "Показатель не найден"
+            return True, f"Индикатор '{indicator.name}' и его значения удалены"
         except Exception as e:
             conn.rollback()
             return False, f"Ошибка: {str(e)}"
-        finally:
-            cur.close()
-    
+
     @staticmethod
     @with_db_connection
     def delete_indicators_by_country(conn, country_id: int) -> Tuple[bool, str]:
-        cur = conn.cursor()
+        stats_repo = StatisticsRepository(conn)
         try:
-            cur.execute("DELETE FROM indicators WHERE country_id = %s", (country_id,))
-            deleted_count = cur.rowcount
+            deleted = stats_repo.delete_by_country(country_id)  # метод реализуем
             conn.commit()
-            return True, f"Удалено {deleted_count} показателей"
+            return True, f"Удалено {deleted} записей показателей для страны"
         except Exception as e:
             conn.rollback()
             return False, f"Ошибка: {str(e)}"
-        finally:
-            cur.close()

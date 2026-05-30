@@ -17,7 +17,7 @@ class ClusteringCalc:
     @staticmethod
     def decimal_to_float(value):
         """Преобразование Decimal в float"""
-        if hasattr(value, 'to_eng_string'):  # это Decimal
+        if hasattr(value, 'to_eng_string'):   
             return float(value)
         return value
     
@@ -41,27 +41,22 @@ class ClusteringCalc:
         df['import_value'] = df['import_value'].apply(lambda x: float(x) if hasattr(x, 'to_eng_string') else x)
         df['gdp_value'] = df['gdp_value'].apply(lambda x: float(x) if hasattr(x, 'to_eng_string') else x)
         
-        # Вычисляем дополнительные показатели
+        # Вычисляем дополнительные показатели (без сальдо и оборота)
         df['export_per_gdp'] = df['export_value'] / df['gdp_value'] * 100
         df['import_per_gdp'] = df['import_value'] / df['gdp_value'] * 100
-        df['trade_balance'] = df['export_value'] - df['import_value']
-        df['trade_balance_per_gdp'] = df['trade_balance'] / df['gdp_value'] * 100
-        df['trade_turnover'] = df['export_value'] + df['import_value']
-        df['trade_turnover_per_gdp'] = df['trade_turnover'] / df['gdp_value'] * 100
         
-        # Логарифмирование для учета масштаба (теперь значения уже float)
+        # Логарифмирование для учета масштаба
         df['log_export'] = np.log1p(df['export_value'].astype(float))
         df['log_import'] = np.log1p(df['import_value'].astype(float))
         df['log_gdp'] = np.log1p(df['gdp_value'].astype(float))
         
-        # Признаки для кластеризации
+        # Признаки для кластеризации 
         feature_columns = [
             'log_gdp',           # Логарифм ВВП (размер экономики)
             'log_export',        # Логарифм экспорта
             'log_import',        # Логарифм импорта
             'export_per_gdp',    # Открытость экономики (экспорт)
-            'import_per_gdp',    # Открытость экономики (импорт)
-            'trade_balance_per_gdp'  # Торговое сальдо относительно ВВП
+            'import_per_gdp'     # Открытость экономики (импорт)
         ]
         
         # Приводим к float и обрабатываем NaN/Inf
@@ -96,7 +91,7 @@ class ClusteringCalc:
                 silhouette_scores.append(-1)
         
         # Находим точку "локтя" (максимальное изменение инерции)
-        optimal_k = 3  # значение по умолчанию
+        optimal_k = 3 
         if len(inertias) >= 2:
             inertia_changes = []
             for i in range(1, len(inertias)):

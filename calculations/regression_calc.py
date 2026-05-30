@@ -5,30 +5,15 @@
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Any, Tuple
+from sklearn.linear_model import Ridge, Lasso
 from calculations.auto_regression import linear_trend
-
-
-def calculate_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
-    """Расчёт метрик качества"""
-    n = len(y_true)
-    ss_res = np.sum((y_true - y_pred) ** 2)
-    ss_tot = np.sum((y_true - np.mean(y_true)) ** 2)
-    r2 = 1 - (ss_res / ss_tot) if ss_tot != 0 else 0
-    rmse = np.sqrt(np.mean((y_true - y_pred) ** 2))
-    mae = np.mean(np.abs(y_true - y_pred))
-    
-    mask = y_true != 0
-    if np.any(mask):
-        mape = np.mean(np.abs((y_true[mask] - y_pred[mask]) / y_true[mask])) * 100
-    else:
-        mape = 100.0
-    
-    return {'r2': float(r2), 'rmse': float(rmse), 'mae': float(mae), 'mape': float(mape)}
+from calculations.metrics import calculate_metrics
 
 
 def prepare_regression_features(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, List[str]]:
     """
-    Подготовка признаков для регрессии ВВП от экспорта и импорта
+    Подготовка признаков для регрессии ВВП от экспорта и импорта.
+    Признаки: экспорт, импорт, произведение, квадраты (без сальдо и оборота).
     """
     if df.empty:
         return np.array([]), np.array([]), []
@@ -37,21 +22,18 @@ def prepare_regression_features(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarra
     export = df['export'].astype(float).values
     import_val = df['import'].astype(float).values
     gdp = df['gdp'].astype(float).values
-    
-    # Признаки: экспорт, импорт, их произведение, квадраты, разность, сумма
+
     features = np.column_stack([
         export,
         import_val,
         export * import_val,
         export ** 2,
-        import_val ** 2,
-        export - import_val,
-        export + import_val
+        import_val ** 2
     ])
     
     feature_names = [
         'экспорт', 'импорт', 'экспорт×импорт',
-        'экспорт²', 'импорт²', 'торговое сальдо', 'торговый оборот'
+        'экспорт²', 'импорт²'
     ]
     
     return features, gdp, feature_names
@@ -81,31 +63,24 @@ def linear_regression_fit(X: np.ndarray, y: np.ndarray) -> tuple:
 
 def ridge_regression_fit(X: np.ndarray, y: np.ndarray, alpha: float = 1.0) -> tuple:
     """
-    Ridge регрессия (L2-регуляризация)
+    Ridge регрессия (L2-регуляризация) с использованием sklearn
     """
-    X_with_intercept = np.column_stack([np.ones(len(X)), X])
-    n_features = X_with_intercept.shape[1]
-    
-    # Ridge решение: β = (X^T X + αI)^(-1) X^T y
-    XTX = X_with_intercept.T @ X_with_intercept
-    ridge_matrix = XTX + alpha * np.eye(n_features)
-    
-    try:
-        coefficients = np.linalg.solve(ridge_matrix, X_with_intercept.T @ y)
-    except np.linalg.LinAlgError:
-        coefficients = np.linalg.pinv(ridge_matrix) @ (X_with_intercept.T @ y)
-    
-    intercept = coefficients[0]
-    slopes = coefficients[1:]
-    
+    model = Ridge(alpha=alpha, fit_intercept=True, copy_X=True)
+    model.fit(X, y)
+    intercept = model.intercept_
+    slopes = model.coef_
     return slopes, intercept
 
 
 def lasso_regression_fit(X: np.ndarray, y: np.ndarray, alpha: float = 1.0) -> tuple:
     """
-    Lasso регрессия - используем Ridge как приближение
+    Lasso регрессия (L1-регуляризация) с использованием sklearn
     """
-    return ridge_regression_fit(X, y, alpha)
+    model = Lasso(alpha=alpha, fit_intercept=True, copy_X=True, max_iter=10000)
+    model.fit(X, y)
+    intercept = model.intercept_
+    slopes = model.coef_
+    return slopes, intercept
 
 
 def train_regression_model(X: np.ndarray, y: np.ndarray, model_type: str = 'linear', **kwargs) -> Dict[str, Any]:
@@ -144,7 +119,7 @@ def train_regression_model(X: np.ndarray, y: np.ndarray, model_type: str = 'line
 
 def predict_gdp_by_regression(df: pd.DataFrame, steps: int = 5, model_type: str = 'linear', **kwargs) -> Dict[str, Any]:
     """
-    Прогноз ВВП через регрессию от экспорта и импорта
+    Прогноз ВВП через регрессию от экспорта и импорта 
     """
     if len(df) < 4:
         return {'error': 'Недостаточно данных для регрессии', 'forecast': []}
@@ -167,7 +142,7 @@ def predict_gdp_by_regression(df: pd.DataFrame, steps: int = 5, model_type: str 
         if export_forecast.get('error') or import_forecast.get('error'):
             return {'error': 'Ошибка прогнозирования экспорта/импорта', 'forecast': []}
         
-        # 3. Подготовка признаков
+        # 3. Подготовка признаков (уже без сальдо и оборота)
         X, y, feature_names = prepare_regression_features(df_float)
         
         # 4. Обучение модели
@@ -189,9 +164,7 @@ def predict_gdp_by_regression(df: pd.DataFrame, steps: int = 5, model_type: str 
                 pred_export, pred_import,
                 pred_export * pred_import,
                 pred_export ** 2,
-                pred_import ** 2,
-                pred_export - pred_import,
-                pred_export + pred_import
+                pred_import ** 2
             ], dtype=float)
             
             pred_gdp = intercept + np.sum(coefficients * features)

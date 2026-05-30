@@ -2,10 +2,14 @@ import pandas as pd
 import io
 from typing import Dict, List, Any
 from database import Database
+from repositories.country_repository import CountryRepository
+from repositories.indicator_repository import IndicatorRepository
+from repositories.statistics_repository import StatisticsRepository
+from models.statistics import Statistics
 
 
 class CSVImportService:
-    
+
     COLUMN_MAPPING = {
         'country': {'keywords': ['country', 'страна', 'name'], 'required': True},
         'year': {'keywords': ['year', 'год'], 'required': True},
@@ -13,7 +17,7 @@ class CSVImportService:
         'import': {'keywords': ['import', 'импорт'], 'required': False},
         'gdp': {'keywords': ['gdp', 'ввп'], 'required': False}
     }
-    
+
     @classmethod
     def detect_columns(cls, columns: List[str]) -> Dict[str, str]:
         detected = {}
@@ -27,7 +31,7 @@ class CSVImportService:
                 if data_type in detected:
                     break
         return detected
-    
+
     @classmethod
     def preview_csv(cls, file_content: bytes, filename: str) -> Dict[str, Any]:
         try:
@@ -42,75 +46,78 @@ class CSVImportService:
             }
         except Exception as e:
             return {'success': False, 'error': str(e)}
-    
+
     @classmethod
-    def import_csv(cls, file_content: bytes, filename: str, 
+    def import_csv(cls, file_content: bytes, filename: str,
                    custom_mapping: Dict[str, str] = None) -> Dict[str, Any]:
         results = {'success': True, 'total_rows': 0, 'imported_rows': 0, 'errors': []}
         conn = None
-        cur = None
-        
+
         try:
             conn = Database.get_connection()
             df = pd.read_csv(io.BytesIO(file_content), encoding='utf-8')
             results['total_rows'] = len(df)
-            
+
             mapping = custom_mapping or cls.detect_columns(df.columns.tolist())
-            
+
+            country_repo = CountryRepository(conn)
+            indicator_repo = IndicatorRepository(conn)
+            stats_repo = StatisticsRepository(conn)
+
+            # Получаем или создаём id для трёх индикаторов
+            indicator_ids = {}
+            for ind_name in ['export_value', 'import_value', 'gdp_value']:
+                ind = indicator_repo.get_by_name(ind_name)
+                if not ind:
+                    ind = indicator_repo.create(ind_name)
+                indicator_ids[ind_name] = ind.id
+
             for idx, row in df.iterrows():
                 try:
                     country_name = str(row[mapping['country']]).strip()
-                    
-                    cur = conn.cursor()
-                    cur.execute("SELECT id FROM countries WHERE name = %s", (country_name,))
-                    country = cur.fetchone()
-                    cur.close()
-                    cur = None
-                    
-                    if country:
-                        country_id = country['id']
-                    else:
-                        cur = conn.cursor()
-                        cur.execute("INSERT INTO countries (name) VALUES (%s) RETURNING id", (country_name,))
-                        country_id = cur.fetchone()['id']
-                        cur.close()
-                        cur = None
-                    
-                    cur = conn.cursor()
-                    cur.execute("""
-                        INSERT INTO indicators (country_id, year, export_value, import_value, gdp_value)
-                        VALUES (%s, %s, %s, %s, %s)
-                        ON CONFLICT (country_id, year) DO UPDATE SET
-                            export_value = EXCLUDED.export_value,
-                            import_value = EXCLUDED.import_value,
-                            gdp_value = EXCLUDED.gdp_value
-                    """, (
-                        country_id,
-                        int(row[mapping['year']]),
-                        float(row[mapping['export']]) if mapping.get('export') and pd.notna(row[mapping['export']]) else None,
-                        float(row[mapping['import']]) if mapping.get('import') and pd.notna(row[mapping['import']]) else None,
-                        float(row[mapping['gdp']]) if mapping.get('gdp') and pd.notna(row[mapping['gdp']]) else None
-                    ))
-                    cur.close()
-                    cur = None
-                    conn.commit()
+                    year = int(row[mapping['year']])
+
+                    # Страна
+                    country = country_repo.get_by_name(country_name)
+                    if not country:
+                        country = country_repo.create(country_name)
+
+                    # Значения
+                    export_val = None
+                    if mapping.get('export') and pd.notna(row[mapping['export']]):
+                        export_val = float(row[mapping['export']])
+                    import_val = None
+                    if mapping.get('import') and pd.notna(row[mapping['import']]):
+                        import_val = float(row[mapping['import']])
+                    gdp_val = None
+                    if mapping.get('gdp') and pd.notna(row[mapping['gdp']]):
+                        gdp_val = float(row[mapping['gdp']])
+
+                    # Сохраняем каждый индикатор
+                    if export_val is not None:
+                        stats_repo.upsert(Statistics(country.id, year, indicator_ids['export_value'], export_val))
+                    if import_val is not None:
+                        stats_repo.upsert(Statistics(country.id, year, indicator_ids['import_value'], import_val))
+                    if gdp_val is not None:
+                        stats_repo.upsert(Statistics(country.id, year, indicator_ids['gdp_value'], gdp_val))
+
                     results['imported_rows'] += 1
-                    
+
                 except Exception as e:
-                    results['errors'].append(f"Строка {idx + 1}: {str(e)}")
+                    results['errors'].append(f"Строка {idx+1}: {str(e)}")
                     conn.rollback()
-            
+                else:
+                    conn.commit()
+
         except Exception as e:
             results['success'] = False
             results['errors'].append(str(e))
         finally:
-            if cur:
-                cur.close()
             if conn:
                 Database.return_connection(conn)
-        
+
         return results
-    
+
     @classmethod
     def generate_template(cls) -> bytes:
         df = pd.DataFrame({

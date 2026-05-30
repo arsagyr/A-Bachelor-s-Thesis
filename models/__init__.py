@@ -1,5 +1,5 @@
 from models.country import Country
 from models.indicator import Indicator
-from models.stats import CountryStats
+from models.statistics import Statistics
 
-__all__ = ['Country', 'Indicator', 'CountryStats']
+__all__ = ['Country', 'Indicator', 'Statistics']

@@ -53,35 +53,60 @@ def with_db_connection(f):
 
 
 def init_database():
+    """Инициализация базы данных по новой схеме: countries, indicators, statistics."""
     conn = Database.get_connection()
     cur = conn.cursor()
     
     try:
+        # Таблица стран (без поля created_at)
         cur.execute("""
             CREATE TABLE IF NOT EXISTS countries (
                 id SERIAL PRIMARY KEY,
-                name VARCHAR(100) NOT NULL UNIQUE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                name VARCHAR(100) NOT NULL UNIQUE
             )
         """)
         
+        # Справочник показателей
         cur.execute("""
             CREATE TABLE IF NOT EXISTS indicators (
                 id SERIAL PRIMARY KEY,
-                country_id INTEGER NOT NULL REFERENCES countries(id) ON DELETE CASCADE,
-                year INTEGER NOT NULL,
-                export_value DECIMAL(15, 2),
-                import_value DECIMAL(15, 2),
-                gdp_value DECIMAL(15, 2),
-                UNIQUE(country_id, year)
+                name VARCHAR(100) NOT NULL UNIQUE
             )
         """)
         
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_indicators_country_year ON indicators(country_id, year)")
+        # Таблица значений показателей
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS statistics (
+                country_id INTEGER NOT NULL REFERENCES countries(id) ON DELETE CASCADE,
+                year INTEGER NOT NULL,
+                indicator_id INTEGER NOT NULL REFERENCES indicators(id) ON DELETE CASCADE,
+                value NUMERIC(20,2) NOT NULL,
+                PRIMARY KEY (country_id, year, indicator_id)
+            )
+        """)
+        
+        # Индексы для ускорения запросов
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_statistics_country ON statistics(country_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_statistics_year ON statistics(year)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_statistics_indicator ON statistics(indicator_id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_countries_name ON countries(name)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_indicators_name ON indicators(name)")
+        
+        # Добавляем базовые показатели (если таблица indicators пуста)
+        cur.execute("SELECT COUNT(*) FROM indicators")
+        count = cur.fetchone()['count']
+        if count == 0:
+            cur.execute("""
+                INSERT INTO indicators (name) VALUES
+                ('export_value'),
+                ('import_value'),
+                ('gdp_value')
+                ON CONFLICT (name) DO NOTHING
+            """)
+            print("✅ Basic indicators added")
         
         conn.commit()
-        print("✅ Database initialized")
+        print("✅ Database initialized with new schema (countries, indicators, statistics)")
     except Exception as e:
         print(f"❌ Error: {e}")
         conn.rollback()

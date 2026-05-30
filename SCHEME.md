@@ -44,4 +44,16 @@ economic_dashboard/
 
 
 
- 
+ economic_dashboard/
+├── app.py
+├── config.py
+├── database.py
+├── requirements.txt
+├── .env
+├── models/
+├── services/
+├── calculations/
+├── routes/
+├── utils/
+├── static/
+└── templates/

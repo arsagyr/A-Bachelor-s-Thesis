@@ -544,22 +544,73 @@ async function previewCSV() {
         
         if (result.success) {
             previewDiv.style.display = 'block';
-            previewDiv.innerHTML = `
+            
+            let tableHtml = `
                 <div class="preview-container">
                     <h4>📋 Предпросмотр</h4>
-                    <pre>${JSON.stringify(result.preview, null, 2)}</pre>
-                    <p><strong>Определено соответствие:</strong></p>
-                    <ul>${Object.entries(result.detected_mapping).map(([k,v]) => `<li>${k}: ${v || '❌ не найдено'}</li>`).join('')}</ul>
+            `;
+            
+            // Проверяем, что preview — массив объектов
+            if (result.preview && Array.isArray(result.preview) && result.preview.length > 0) {
+                tableHtml += '<div style="overflow-x: auto;">';
+                tableHtml += '<table class="preview-table" border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse; width: 100%;">';
+                
+                // Заголовки таблицы (ключи первого объекта)
+                const headers = Object.keys(result.preview[0]);
+                tableHtml += '<thead><tr>';
+                headers.forEach(header => {
+                    tableHtml += `<th style="background-color: #f2f2f2; padding: 8px; text-align: left;">${escapeHtml(header)}</th>`;
+                });
+                tableHtml += '</tr></thead><tbody>';
+                
+                // Строки данных
+                result.preview.forEach(row => {
+                    tableHtml += '<tr>';
+                    headers.forEach(header => {
+                        let value = row[header] !== undefined && row[header] !== null ? row[header] : '';
+                        tableHtml += `<td style="padding: 8px;">${escapeHtml(String(value))}</td>`;
+                    });
+                    tableHtml += '</tr>';
+                });
+                
+                tableHtml += '</tbody></table></div>';
+            } else {
+                tableHtml += '<p>Нет данных для предпросмотра</p>';
+            }
+            
+            // Отображение определённого соответствия колонок
+            if (result.detected_mapping && Object.keys(result.detected_mapping).length) {
+                tableHtml += '<p><strong>Определено соответствие:</strong></p><ul>';
+                for (const [key, value] of Object.entries(result.detected_mapping)) {
+                    tableHtml += `<li>${escapeHtml(key)}: ${value ? escapeHtml(value) : '❌ не найдено'}</li>`;
+                }
+                tableHtml += '</ul>';
+            }
+            
+            tableHtml += `
                     <button onclick="importCSV()" class="btn-primary">🚀 Импортировать</button>
                     <button onclick="document.getElementById('previewContainer').style.display='none'" class="btn-secondary">❌ Отмена</button>
                 </div>
             `;
+            
+            previewDiv.innerHTML = tableHtml;
         } else {
             alert('Ошибка: ' + result.error);
         }
     } catch (error) {
         alert('Ошибка: ' + error.message);
     }
+}
+
+// Вспомогательная функция для экранирования HTML-символов (защита от XSS)
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/[&<>]/g, function(m) {
+        if (m === '&') return '&amp;';
+        if (m === '<') return '&lt;';
+        if (m === '>') return '&gt;';
+        return m;
+    });
 }
 
 async function importCSV() {
