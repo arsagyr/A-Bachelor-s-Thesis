@@ -42,18 +42,3 @@ economic_dashboard/
     ├── index.html
     └── trends.html
 
-
-
- economic_dashboard/
-├── app.py
-├── config.py
-├── database.py
-├── requirements.txt
-├── .env
-├── models/
-├── services/
-├── calculations/
-├── routes/
-├── utils/
-├── static/
-└── templates/

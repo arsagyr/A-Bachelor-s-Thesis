@@ -15,66 +15,54 @@ class ForecastService:
         'polynomial': 'Полиномиальная регрессия',
         'exponential': 'Экспоненциальная регрессия',
         'ridge': 'Ridge регрессия',
-        'lasso': 'Lasso регрессия'
+        'lasso': 'Lasso регрессия',
     }
-
 
     @staticmethod
     @with_db_connection
     def check_irwin(conn, country_id: int, indicator: str, threshold: float = 3.0) -> Dict[str, Any]:
         """
         Проверка временного ряда на аномалии по критерию Ирвина.
-        
-        Args:
-            country_id: ID страны
-            indicator: название индикатора ('export_value', 'import_value', 'gdp_value')
-            threshold: пороговое значение (обычно 3)
-        
-        Returns:
-            Результаты проверки: список аномалий, λ-статистики
         """
-        # Получаем id индикатора
         ind_repo = IndicatorRepository(conn)
         indicator_obj = ind_repo.get_by_name(indicator)
         if not indicator_obj:
             return {'success': False, 'error': f'Неизвестный индикатор: {indicator}'}
 
-        # Получаем исторические данные
         stats_repo = StatisticsRepository(conn)
         all_stats = stats_repo.get_by_country(country_id)
-        hist = [(s.year, s.value) for s in all_stats 
-                if s.indicator_id == indicator_obj.id and s.value is not None]
-        hist.sort(key=lambda x: x[0])
+        hist = sorted(
+            [(s.year, s.value) for s in all_stats
+             if s.indicator_id == indicator_obj.id and s.value is not None],
+            key=lambda x: x[0],
+        )
 
         if len(hist) < 3:
             return {'success': False, 'error': f'Недостаточно данных: {len(hist)} точек'}
 
-        values = [v for _, v in hist]
         years = [y for y, _ in hist]
+        values = [v for _, v in hist]
 
-        # Импортируем функцию из calculations.auto_regression
         from calculations.auto_regression import irwin_criterion
         result = irwin_criterion(values, threshold)
 
         if result.get('error'):
             return {'success': False, 'error': result['error']}
 
-        # Получаем название страны
         country_repo = CountryRepository(conn)
         country = country_repo.get_by_id(country_id)
         country_name = country.name if country else 'Unknown'
 
-        # Добавляем годы к аномалиям
-        outliers_with_years = []
-        for outlier in result.get('outliers', []):
-            idx = outlier['index']
-            outliers_with_years.append({
-                'year': years[idx],
-                'value': outlier['value'],
-                'lambda': outlier['lambda'],
-                'prev_value': outlier['prev_value'],
-                'prev_year': years[idx-1]
-            })
+        outliers_with_years = [
+            {
+                'year': years[o['index']],
+                'value': o['value'],
+                'lambda': o['lambda'],
+                'prev_value': o['prev_value'],
+                'prev_year': years[o['index'] - 1],
+            }
+            for o in result.get('outliers', [])
+        ]
 
         return {
             'success': True,
@@ -84,26 +72,33 @@ class ForecastService:
             'sigma_diff': result['sigma_diff'],
             'outliers': outliers_with_years,
             'outlier_count': result['outlier_count'],
-            'all_lambda': result['all_lambda']
+            'all_lambda': result['all_lambda'],
         }
-
 
     @staticmethod
     @with_db_connection
-    def get_forecast(conn, country_id: int, indicator: str, steps: int = 5,
-                     model_type: str = 'auto', degree: int = 2, alpha: float = 1.0) -> Dict[str, Any]:
-        # Получаем id индикатора
+    def get_forecast(
+        conn,
+        country_id: int,
+        indicator: str,
+        steps: int = 5,
+        model_type: str = 'auto',
+        degree: int = 2,
+        alpha: float = 1.0,
+    ) -> Dict[str, Any]:
+
         ind_repo = IndicatorRepository(conn)
         indicator_obj = ind_repo.get_by_name(indicator)
         if not indicator_obj:
             return {'success': False, 'error': f'Неизвестный индикатор: {indicator}'}
 
-        # Получаем исторические данные
         stats_repo = StatisticsRepository(conn)
         all_stats = stats_repo.get_by_country(country_id)
-        # Фильтруем по нужному индикатору и сортируем по году
-        hist = [(s.year, s.value) for s in all_stats if s.indicator_id == indicator_obj.id and s.value is not None]
-        hist.sort(key=lambda x: x[0])
+        hist = sorted(
+            [(s.year, s.value) for s in all_stats
+             if s.indicator_id == indicator_obj.id and s.value is not None],
+            key=lambda x: x[0],
+        )
 
         if len(hist) < 3:
             return {'success': False, 'error': f'Недостаточно данных: {len(hist)} точек'}
@@ -111,12 +106,10 @@ class ForecastService:
         historical_years = [h[0] for h in hist]
         historical_values = [h[1] for h in hist]
 
-        # Получаем название страны
         country_repo = CountryRepository(conn)
         country = country_repo.get_by_id(country_id)
         country_name = country.name if country else 'Unknown'
 
-        # Прогноз
         if model_type == 'auto':
             result = compare_auto_regression_models(historical_values, steps)
             best_model_name = result.get('best_model')
@@ -126,10 +119,10 @@ class ForecastService:
                 result['model_type'] = best_model_name
                 result['model_name'] = best_result.get('model_name', best_model_name)
                 result['best_model'] = best_model_name
-                result['best_model_name'] = result.get('best_model_name', best_model_name)
-                result['best_r2'] = result.get('best_r2', 0)
         else:
-            result = auto_regression_forecast(historical_values, steps, model_type, degree=degree, alpha=alpha)
+            result = auto_regression_forecast(
+                historical_values, steps, model_type, degree=degree, alpha=alpha
+            )
 
         if not result.get('success'):
             return {'success': False, 'error': result.get('error', 'Ошибка прогнозирования')}
@@ -140,7 +133,7 @@ class ForecastService:
         indicator_names = {
             'export_value': 'Экспорт',
             'import_value': 'Импорт',
-            'gdp_value': 'ВВП'
+            'gdp_value': 'ВВП',
         }
 
         metrics = result.get('metrics', {})
@@ -168,7 +161,7 @@ class ForecastService:
                 'r2': float(r2),
                 'rmse': float(rmse),
                 'mae': float(mae),
-                'mape': float(mape)
+                'mape': float(mape),
             },
             'formula': result.get('formula', ''),
             'unit': 'млрд USD',
@@ -178,16 +171,14 @@ class ForecastService:
             'slope': slope,
             'intercept': intercept,
             'coefficients': coefficients,
-            'degree': result.get('degree', degree)
+            'degree': result.get('degree', degree),
         }
 
-        # Модельные предсказания
+        # Модельные предсказания по всей оси t (исторические + прогнозные)
         n = len(historical_values)
-        total_points = n + steps
         model_predictions = []
-        for i in range(total_points):
+        for i in range(n + steps):
             x = i + 1
-            pred = 0
             if actual_model_type == 'linear' and slope is not None and intercept is not None:
                 pred = intercept + slope * x
             elif actual_model_type == 'polynomial' and coefficients:
@@ -196,14 +187,11 @@ class ForecastService:
                     pred += coeff * (x ** power)
             elif actual_model_type == 'exponential' and slope is not None and intercept is not None:
                 pred = np.exp(intercept + slope * x)
-            elif actual_model_type in ['ridge', 'lasso'] and slope is not None:
-                pred = intercept + slope * x if intercept else slope * x
+            elif actual_model_type in ('ridge', 'lasso') and slope is not None:
+                pred = (intercept or 0) + slope * x
             else:
-                if i < n:
-                    pred = historical_values[i]
-                else:
-                    forecast_list = result.get('forecast', [])
-                    pred = forecast_list[i - n] if i - n < len(forecast_list) else 0
+                forecast_list = result.get('forecast', [])
+                pred = historical_values[i] if i < n else (forecast_list[i - n] if i - n < len(forecast_list) else 0)
             model_predictions.append(pred)
         response['model_predictions'] = model_predictions
 
@@ -214,4 +202,3 @@ class ForecastService:
             response['best_r2'] = result.get('best_r2')
 
         return response
-    
