@@ -18,6 +18,76 @@ class ForecastService:
         'lasso': 'Lasso регрессия'
     }
 
+
+    @staticmethod
+    @with_db_connection
+    def check_irwin(conn, country_id: int, indicator: str, threshold: float = 3.0) -> Dict[str, Any]:
+        """
+        Проверка временного ряда на аномалии по критерию Ирвина.
+        
+        Args:
+            country_id: ID страны
+            indicator: название индикатора ('export_value', 'import_value', 'gdp_value')
+            threshold: пороговое значение (обычно 3)
+        
+        Returns:
+            Результаты проверки: список аномалий, λ-статистики
+        """
+        # Получаем id индикатора
+        ind_repo = IndicatorRepository(conn)
+        indicator_obj = ind_repo.get_by_name(indicator)
+        if not indicator_obj:
+            return {'success': False, 'error': f'Неизвестный индикатор: {indicator}'}
+
+        # Получаем исторические данные
+        stats_repo = StatisticsRepository(conn)
+        all_stats = stats_repo.get_by_country(country_id)
+        hist = [(s.year, s.value) for s in all_stats 
+                if s.indicator_id == indicator_obj.id and s.value is not None]
+        hist.sort(key=lambda x: x[0])
+
+        if len(hist) < 3:
+            return {'success': False, 'error': f'Недостаточно данных: {len(hist)} точек'}
+
+        values = [v for _, v in hist]
+        years = [y for y, _ in hist]
+
+        # Импортируем функцию из calculations.auto_regression
+        from calculations.auto_regression import irwin_criterion
+        result = irwin_criterion(values, threshold)
+
+        if result.get('error'):
+            return {'success': False, 'error': result['error']}
+
+        # Получаем название страны
+        country_repo = CountryRepository(conn)
+        country = country_repo.get_by_id(country_id)
+        country_name = country.name if country else 'Unknown'
+
+        # Добавляем годы к аномалиям
+        outliers_with_years = []
+        for outlier in result.get('outliers', []):
+            idx = outlier['index']
+            outliers_with_years.append({
+                'year': years[idx],
+                'value': outlier['value'],
+                'lambda': outlier['lambda'],
+                'prev_value': outlier['prev_value'],
+                'prev_year': years[idx-1]
+            })
+
+        return {
+            'success': True,
+            'country_name': country_name,
+            'indicator_name': indicator,
+            'threshold': threshold,
+            'sigma_diff': result['sigma_diff'],
+            'outliers': outliers_with_years,
+            'outlier_count': result['outlier_count'],
+            'all_lambda': result['all_lambda']
+        }
+
+
     @staticmethod
     @with_db_connection
     def get_forecast(conn, country_id: int, indicator: str, steps: int = 5,
@@ -144,3 +214,4 @@ class ForecastService:
             response['best_r2'] = result.get('best_r2')
 
         return response
+    

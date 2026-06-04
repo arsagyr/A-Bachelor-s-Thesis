@@ -400,3 +400,79 @@ button:hover {
     word-break: break-word;
     color: #2ecc71;
 }
+
+/* Критерий Ирвина */
+.irwin-section {
+    margin-top: 40px;
+    padding: 25px;
+    background: linear-gradient(135deg, #fef9e7 0%, #fdebd0 100%);
+    border-radius: 15px;
+}
+.irwin-controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+    padding: 20px;
+    background: white;
+    border-radius: 10px;
+}
+.irwin-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin: 20px 0;
+}
+.irwin-table-container {
+    overflow-x: auto;
+    margin-top: 20px;
+}
+.irwin-table-container .data-table td.significant {
+    background-color: #f8d7da;
+    font-weight: bold;
+    color: #721c24;
+}
+
+/* Статистики регрессии */
+.regression-stats-section {
+    margin-top: 40px;
+    padding: 25px;
+    background: linear-gradient(135deg, #eaf2f8 0%, #d4e6f1 100%);
+    border-radius: 15px;
+}
+.regression-stats-controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+    padding: 20px;
+    background: white;
+    border-radius: 10px;
+}
+.stats-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin: 20px 0;
+}
+.stats-coefficients {
+    margin: 20px 0;
+    overflow-x: auto;
+}
+.stats-f-test {
+    margin: 20px 0;
+}
+.significant {
+    font-weight: bold;
+    color: #27ae60;
+}
+.insignificant {
+    font-weight: normal;
+    color: #e74c3c;
+}
+.data-table td.significant {
+    background-color: #d5f5e3;
+}
+.data-table td.insignificant {
+    background-color: #fadbd8;
+}

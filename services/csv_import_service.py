@@ -15,7 +15,8 @@ class CSVImportService:
         'year': {'keywords': ['year', 'год'], 'required': True},
         'export': {'keywords': ['export', 'экспорт'], 'required': False},
         'import': {'keywords': ['import', 'импорт'], 'required': False},
-        'gdp': {'keywords': ['gdp', 'ввп'], 'required': False}
+        'gdp': {'keywords': ['gdp', 'ввп'], 'required': False},
+        'population': {'keywords': ['population', 'население', 'people'], 'required': False}
     }
 
     @classmethod
@@ -64,9 +65,9 @@ class CSVImportService:
             indicator_repo = IndicatorRepository(conn)
             stats_repo = StatisticsRepository(conn)
 
-            # Получаем или создаём id для трёх индикаторов
+            # Получаем или создаём id для индикаторов (включая население)
             indicator_ids = {}
-            for ind_name in ['export_value', 'import_value', 'gdp_value']:
+            for ind_name in ['export_value', 'import_value', 'gdp_value', 'population_value']:
                 ind = indicator_repo.get_by_name(ind_name)
                 if not ind:
                     ind = indicator_repo.create(ind_name)
@@ -86,12 +87,18 @@ class CSVImportService:
                     export_val = None
                     if mapping.get('export') and pd.notna(row[mapping['export']]):
                         export_val = float(row[mapping['export']])
+
                     import_val = None
                     if mapping.get('import') and pd.notna(row[mapping['import']]):
                         import_val = float(row[mapping['import']])
+
                     gdp_val = None
                     if mapping.get('gdp') and pd.notna(row[mapping['gdp']]):
                         gdp_val = float(row[mapping['gdp']])
+
+                    population_val = None
+                    if mapping.get('population') and pd.notna(row[mapping['population']]):
+                        population_val = float(row[mapping['population']])
 
                     # Сохраняем каждый индикатор
                     if export_val is not None:
@@ -100,6 +107,8 @@ class CSVImportService:
                         stats_repo.upsert(Statistics(country.id, year, indicator_ids['import_value'], import_val))
                     if gdp_val is not None:
                         stats_repo.upsert(Statistics(country.id, year, indicator_ids['gdp_value'], gdp_val))
+                    if population_val is not None:
+                        stats_repo.upsert(Statistics(country.id, year, indicator_ids['population_value'], population_val))
 
                     results['imported_rows'] += 1
 
@@ -125,7 +134,8 @@ class CSVImportService:
             'year': [2020, 2020, 2020],
             'export_value': [332.5, 1430.0, 2590.0],
             'import_value': [238.0, 2400.0, 2050.0],
-            'gdp_value': [1480.0, 20900.0, 14700.0]
+            'gdp_value': [1480.0, 20900.0, 14700.0],
+            'population_value': [144.1, 331.0, 1411.0]   # миллионы человек
         })
         output = io.BytesIO()
         df.to_csv(output, index=False, encoding='utf-8-sig')

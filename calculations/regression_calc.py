@@ -8,7 +8,7 @@ from typing import Dict, List, Any, Tuple
 from sklearn.linear_model import Ridge, Lasso
 from calculations.auto_regression import linear_trend
 from calculations.metrics import calculate_metrics
-
+from scipy import stats
 
 def prepare_regression_features(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, List[str]]:
     """
@@ -85,7 +85,7 @@ def lasso_regression_fit(X: np.ndarray, y: np.ndarray, alpha: float = 1.0) -> tu
 
 def train_regression_model(X: np.ndarray, y: np.ndarray, model_type: str = 'linear', **kwargs) -> Dict[str, Any]:
     """
-    Обучение регрессионной модели
+    Обучение регрессионной модели с расчётом статистик Стьюдента и Фишера.
     """
     if len(X) < 4:
         return {'error': f'Недостаточно данных: {len(X)} точек'}
@@ -107,15 +107,23 @@ def train_regression_model(X: np.ndarray, y: np.ndarray, model_type: str = 'line
         y_pred = X_with_intercept @ np.concatenate([[intercept], slopes])
         metrics = calculate_metrics(y, y_pred)
         
-        return {
+        # Расчёт статистик (только для линейной модели, ridge/lasso дают смещённые оценки)
+        statistics = None
+        if model_type == 'linear':
+            statistics = calculate_regression_statistics(X, y, np.array(slopes), intercept)
+        
+        result = {
             'success': True,
             'coefficients': slopes.tolist() if hasattr(slopes, 'tolist') else [float(slopes)],
             'intercept': float(intercept),
             'metrics': metrics
         }
+        if statistics:
+            result['statistics'] = statistics
+        
+        return result
     except Exception as e:
         return {'error': str(e)}
-
 
 def predict_gdp_by_regression(df: pd.DataFrame, steps: int = 5, model_type: str = 'linear', **kwargs) -> Dict[str, Any]:
     """
@@ -191,3 +199,101 @@ def predict_gdp_by_regression(df: pd.DataFrame, steps: int = 5, model_type: str 
         import traceback
         traceback.print_exc()
         return {'error': str(e), 'forecast': []}
+    
+def calculate_regression_statistics(X: np.ndarray, y: np.ndarray, 
+                                    coefficients: np.ndarray, intercept: float) -> Dict[str, Any]:
+    """
+    Расчёт статистик значимости для линейной регрессии:
+    - t-статистики и p-значения для каждого коэффициента (Стьюдент)
+    - F-статистики и p-значения для модели (Фишер)
+    - скорректированный R-squared
+    - стандартные ошибки коэффициентов
+    
+    Args:
+        X: матрица признаков (n_samples, n_features)
+        y: целевая переменная
+        coefficients: вектор коэффициентов при признаках (без intercept)
+        intercept: свободный член
+    
+    Returns:
+        словарь со статистиками
+    """
+    n_samples, n_features = X.shape
+    n_params = n_features + 1  # + intercept
+    
+    # Предсказания
+    y_pred = intercept + X @ coefficients
+    residuals = y - y_pred
+    
+    # Остаточная сумма квадратов
+    rss = np.sum(residuals ** 2)
+    # Общая сумма квадратов
+    tss = np.sum((y - np.mean(y)) ** 2)
+    # R-squared
+    r2 = 1 - rss / tss if tss != 0 else 0
+    # Скорректированный R-squared
+    r2_adj = 1 - (1 - r2) * (n_samples - 1) / (n_samples - n_params - 1) if n_samples > n_params + 1 else r2
+    
+    # Оценка дисперсии ошибок
+    if n_samples > n_params:
+        residual_variance = rss / (n_samples - n_params)
+    else:
+        residual_variance = np.nan
+    
+    # Стандартные ошибки коэффициентов
+    # Добавляем столбец единиц для intercept
+    X_design = np.column_stack([np.ones(n_samples), X])
+    try:
+        XTX_inv = np.linalg.inv(X_design.T @ X_design)
+        std_errors = np.sqrt(np.diag(XTX_inv) * residual_variance) if not np.isnan(residual_variance) else np.full(n_params, np.nan)
+    except np.linalg.LinAlgError:
+        # Если матрица вырождена, используем псевдообратную
+        XTX_pinv = np.linalg.pinv(X_design.T @ X_design)
+        std_errors = np.sqrt(np.diag(XTX_pinv) * residual_variance) if not np.isnan(residual_variance) else np.full(n_params, np.nan)
+    
+    # t-статистики и p-значения для каждого коэффициента
+    t_stats = coefficients / std_errors[1:] if not np.isnan(residual_variance) else np.full(n_features, np.nan)
+    t_stats_intercept = intercept / std_errors[0] if not np.isnan(residual_variance) else np.nan
+    
+    p_values = 2 * (1 - stats.t.cdf(np.abs(t_stats), df=n_samples - n_params)) if not np.isnan(residual_variance) else np.full(n_features, np.nan)
+    p_value_intercept = 2 * (1 - stats.t.cdf(np.abs(t_stats_intercept), df=n_samples - n_params)) if not np.isnan(residual_variance) else np.nan
+    
+    # F-статистика для модели
+    # F = (RSS_reduced - RSS_full) / (p_full - p_reduced) / (RSS_full / (n - p_full))
+    # Для проверки общей значимости: RSS_reduced = TSS (модель только с intercept)
+    if n_samples > n_params and rss > 0:
+        f_stat = (tss - rss) / n_features / (rss / (n_samples - n_params))
+        f_p_value = 1 - stats.f.cdf(f_stat, n_features, n_samples - n_params)
+    else:
+        f_stat = np.nan
+        f_p_value = np.nan
+    
+    return {
+        'r2': float(r2),
+        'r2_adjusted': float(r2_adj),
+        'residual_std_error': float(np.sqrt(residual_variance)) if not np.isnan(residual_variance) else None,
+        'coefficients': {
+            'intercept': {
+                'value': float(intercept),
+                'std_error': float(std_errors[0]) if not np.isnan(std_errors[0]) else None,
+                't_statistic': float(t_stats_intercept) if not np.isnan(t_stats_intercept) else None,
+                'p_value': float(p_value_intercept) if not np.isnan(p_value_intercept) else None
+            },
+            'features': [
+                {
+                    'index': i,
+                    'value': float(coefficients[i]),
+                    'std_error': float(std_errors[i+1]) if not np.isnan(std_errors[i+1]) else None,
+                    't_statistic': float(t_stats[i]) if not np.isnan(t_stats[i]) else None,
+                    'p_value': float(p_values[i]) if not np.isnan(p_values[i]) else None
+                }
+                for i in range(n_features)
+            ]
+        },
+        'f_statistic': {
+            'value': float(f_stat) if not np.isnan(f_stat) else None,
+            'p_value': float(f_p_value) if not np.isnan(f_p_value) else None,
+            'df_model': n_features,
+            'df_residual': n_samples - n_params
+        }
+    }

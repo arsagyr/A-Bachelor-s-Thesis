@@ -27,8 +27,8 @@ class ClusteringCalc:
         Подготовка признаков для кластеризации
         
         Args:
-            df: DataFrame с колонками country_id, country_name, export_value, import_value, gdp_value
-            
+            df: DataFrame с колонками country_id, country_name, export_value, import_value, gdp_value, population_value
+                
         Returns:
             features: нормализованная матрица признаков
             feature_names: названия признаков
@@ -37,26 +37,38 @@ class ClusteringCalc:
             return np.array([]), []
         
         # Преобразуем Decimal в float для всех нужных колонок
-        df['export_value'] = df['export_value'].apply(lambda x: float(x) if hasattr(x, 'to_eng_string') else x)
-        df['import_value'] = df['import_value'].apply(lambda x: float(x) if hasattr(x, 'to_eng_string') else x)
-        df['gdp_value'] = df['gdp_value'].apply(lambda x: float(x) if hasattr(x, 'to_eng_string') else x)
+        for col in ['export_value', 'import_value', 'gdp_value', 'population_value']:
+            if col in df.columns:
+                df[col] = df[col].apply(lambda x: float(x) if hasattr(x, 'to_eng_string') else x)
         
-        # Вычисляем дополнительные показатели (без сальдо и оборота)
+        # Вычисляем дополнительные показатели
         df['export_per_gdp'] = df['export_value'] / df['gdp_value'] * 100
         df['import_per_gdp'] = df['import_value'] / df['gdp_value'] * 100
+        df['trade_balance'] = df['export_value'] - df['import_value']  # торговый баланс (млрд USD)
         
-        # Логарифмирование для учета масштаба
+        # ВВП на душу населения (USD)
+        # ВВП в млрд USD, население в млн человек → ВВП на душу = (gdp * 1e9) / (population * 1e6) = gdp / population * 1000
+        df['gdp_per_capita'] = df['gdp_value'] / df['population_value'] * 1000
+        
+        # Логарифмирование для учёта масштаба (для положительных величин)
+        df['log_gdp'] = np.log1p(df['gdp_value'].astype(float))
         df['log_export'] = np.log1p(df['export_value'].astype(float))
         df['log_import'] = np.log1p(df['import_value'].astype(float))
-        df['log_gdp'] = np.log1p(df['gdp_value'].astype(float))
+        df['log_population'] = np.log1p(df['population_value'].astype(float))
         
-        # Признаки для кластеризации 
+        # Торговый баланс может быть отрицательным, поэтому используем его как есть
+        # ВВП на душу всегда положителен, можно прологарифмировать
+        df['log_gdp_per_capita'] = np.log1p(df['gdp_per_capita'].astype(float))
+        
+        # Признаки для кластеризации (расширенный набор)
         feature_columns = [
-            'log_gdp',           # Логарифм ВВП (размер экономики)
-            'log_export',        # Логарифм экспорта
-            'log_import',        # Логарифм импорта
-            'export_per_gdp',    # Открытость экономики (экспорт)
-            'import_per_gdp'     # Открытость экономики (импорт)
+            'log_gdp',               # логарифм ВВП (размер экономики)
+            'log_export',            # логарифм экспорта
+            'log_import',            # логарифм импорта
+            'export_per_gdp',        # открытость экономики (экспорт)
+            'import_per_gdp',        # открытость экономики (импорт)
+            'trade_balance',         # торговый баланс (абсолютный)
+            'log_gdp_per_capita'     # логарифм ВВП на душу (уровень развития)
         ]
         
         # Приводим к float и обрабатываем NaN/Inf
@@ -66,7 +78,7 @@ class ClusteringCalc:
         return features, feature_columns
     
     @staticmethod
-    def find_optimal_clusters(features: np.ndarray, max_k: int = 6) -> Dict[str, Any]:
+    def find_optimal_clusters(features: np.ndarray, max_k: int = 8) -> Dict[str, Any]:
         """
         Определение оптимального количества кластеров методом локтя
         """
@@ -77,41 +89,55 @@ class ClusteringCalc:
         max_possible_k = min(max_k, n_samples - 1)
         
         inertias = []
+        k_values = []
         silhouette_scores = []
         
+        # Для k=1: инерция = сумма квадратов отклонений от среднего (TSS)
+        tss = np.sum((features - np.mean(features, axis=0)) ** 2)
+        inertias.append(float(tss))
+        k_values.append(1)
+        silhouette_scores.append(None)  # для k=1 силуэт не определён
+        
+        # Для k от 2 до max_possible_k
         for k in range(2, max_possible_k + 1):
             kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
             kmeans.fit(features)
-            inertias.append(kmeans.inertia_)
+            inertias.append(float(kmeans.inertia_))
+            k_values.append(k)
             
             if len(np.unique(kmeans.labels_)) > 1:
                 score = silhouette_score(features, kmeans.labels_)
-                silhouette_scores.append(score)
+                silhouette_scores.append(float(score))
             else:
-                silhouette_scores.append(-1)
+                silhouette_scores.append(-1.0)
         
-        # Находим точку "локтя" (максимальное изменение инерции)
-        optimal_k = 3 
-        if len(inertias) >= 2:
+        # Определение оптимального k (по "локтю") – оставляем прежнюю логику, но сдвигаем индексы
+        optimal_k = 3
+        if len(inertias) >= 3:  # теперь в массиве есть k=1,2,3,...
             inertia_changes = []
-            for i in range(1, len(inertias)):
-                change = (inertias[i-1] - inertias[i]) / inertias[i-1] * 100 if inertias[i-1] > 0 else 0
+            # изменение между последовательными k (начиная с k=2)
+            for i in range(2, len(inertias)):
+                prev_inertia = inertias[i-1]
+                curr_inertia = inertias[i]
+                change = (prev_inertia - curr_inertia) / prev_inertia * 100 if prev_inertia > 0 else 0
                 inertia_changes.append(change)
             
             # Оптимальное k там, где изменение резко замедляется (< 10%)
-            for i, change in enumerate(inertia_changes):
+            # индекс в inertia_changes соответствует k = i+2
+            for idx, change in enumerate(inertia_changes):
                 if change < 10:
-                    optimal_k = i + 2
+                    optimal_k = idx + 2   # т.к. изменения начались с k=2, первое изменение соответствует k=2->3
                     break
         
         optimal_k = min(optimal_k, max_possible_k)
         
         return {
             'optimal_k': int(optimal_k),
-            'inertias': [float(x) for x in inertias],
-            'silhouette_scores': [float(x) for x in silhouette_scores],
-            'k_values': list(range(2, max_possible_k + 1))
+            'k_values': k_values,               # [1,2,3,...,max_possible_k]
+            'inertias': inertias,               # соответствующие инерции
+            'silhouette_scores': silhouette_scores
         }
+
     
     @staticmethod
     def perform_clustering(features: np.ndarray, n_clusters: int = 3) -> Dict[str, Any]:

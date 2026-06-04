@@ -830,18 +830,23 @@ function displayClusteringResults(results) {
     if (results.elbow_analysis && results.elbow_analysis.k_values && results.elbow_analysis.k_values.length > 0) {
         if (elbowChart) elbowChart.destroy();
         
+        const kValues = results.elbow_analysis.k_values;
+        const inertias = results.elbow_analysis.inertias;
+        
         const elbowCtx = document.getElementById('elbowChart').getContext('2d');
         elbowChart = new Chart(elbowCtx, {
             type: 'line',
             data: {
-                labels: results.elbow_analysis.k_values,
+                labels: kValues.map(k => `k = ${k}`),
                 datasets: [{
                     label: 'Инерция (WCSS)',
-                    data: results.elbow_analysis.inertias,
+                    data: inertias,
                     borderColor: 'rgb(75, 192, 192)',
                     backgroundColor: 'rgba(75, 192, 192, 0.1)',
                     tension: 0.1,
-                    fill: true
+                    fill: true,
+                    pointRadius: 5,
+                    pointHoverRadius: 7
                 }]
             },
             options: {
@@ -851,14 +856,27 @@ function displayClusteringResults(results) {
                     tooltip: {
                         callbacks: {
                             label: function(context) {
-                                return 'Инерция: ' + context.parsed.y.toFixed(2);
+                                return `Инерция: ${context.parsed.y.toFixed(2)}`;
                             }
                         }
+                    },
+                    // Опционально: подписать значения инерции над точками
+                    datalabels: {
+                        display: true,
+                        color: 'black',
+                        align: 'top',
+                        formatter: (value) => value.toFixed(0)
                     }
                 },
                 scales: {
-                    x: { title: { display: true, text: 'Количество кластеров (k)' } },
-                    y: { title: { display: true, text: 'Инерция (WCSS)' } }
+                    x: { 
+                        title: { display: true, text: 'Количество кластеров (k)' },
+                        ticks: { stepSize: 1 }
+                    },
+                    y: { 
+                        title: { display: true, text: 'Инерция (WCSS)' },
+                        ticks: { callback: (value) => value.toFixed(0) }
+                    }
                 }
             }
         });
@@ -1021,19 +1039,192 @@ function hideClusteringLoading() {
 }
 
 
+// ==================== КРИТЕРИЙ ИРВИНА ====================
+async function checkIrwin() {
+    const countryId = document.getElementById('countrySelect').value;
+    if (!countryId) {
+        alert('Сначала выберите страну');
+        return;
+    }
+    const indicator = document.getElementById('irwinIndicator').value;
+    const threshold = parseFloat(document.getElementById('irwinThreshold').value);
+    
+    const url = `/api/irwin/${countryId}/${indicator}?threshold=${threshold}`;
+    
+    try {
+        const response = await fetch(url);
+        const result = await response.json();
+        if (result.success) {
+            displayIrwinResults(result);
+        } else {
+            alert('Ошибка: ' + (result.error || 'Неизвестная ошибка'));
+            document.getElementById('irwinResult').style.display = 'none';
+        }
+    } catch (error) {
+        alert('Ошибка: ' + error.message);
+    }
+}
+
+function displayIrwinResults(data) {
+    const resultDiv = document.getElementById('irwinResult');
+    resultDiv.style.display = 'block';
+    
+    // Статистика
+    const statsHtml = `
+        <div class="irwin-stats">
+            <div class="metric-card">
+                <h4>📏 Порог (λ)</h4>
+                <div class="value">${data.threshold}</div>
+            </div>
+            <div class="metric-card">
+                <h4>📊 СКО разностей</h4>
+                <div class="value">${data.sigma_diff?.toFixed(4) || 'N/A'}</div>
+            </div>
+            <div class="metric-card">
+                <h4>⚠️ Найдено аномалий</h4>
+                <div class="value">${data.outlier_count}</div>
+            </div>
+        </div>
+    `;
+    resultDiv.querySelector('.irwin-stats').innerHTML = statsHtml;
+    
+    // Таблица аномалий
+    if (data.outliers && data.outliers.length > 0) {
+        let tableHtml = `<div class="irwin-table-container"><h4>📋 Обнаруженные аномалии</h4>
+            <table class="data-table"><thead><tr>
+                <th>Год</th><th>Значение (млрд USD)</th><th>λ (Ирвина)</th><th>Предыдущее значение</th><th>Предыдущий год</th>
+            </tr></thead><tbody>`;
+        for (const o of data.outliers) {
+            tableHtml += `<tr>
+                <td>${o.year}</td>
+                <td>${o.value.toFixed(2)}</td>
+                <td class="${o.lambda > data.threshold ? 'significant' : ''}">${o.lambda.toFixed(4)}</td>
+                <td>${o.prev_value.toFixed(2)}</td>
+                <td>${o.prev_year}</td>
+            </tr>`;
+        }
+        tableHtml += `</tbody></table></div>`;
+        resultDiv.querySelector('.irwin-table-container').innerHTML = tableHtml;
+    } else {
+        resultDiv.querySelector('.irwin-table-container').innerHTML = `<div class="info-message">✅ Аномалий не обнаружено.</div>`;
+    }
+}
+
+// ==================== СТАТИСТИКИ РЕГРЕССИИ (ФИШЕР, СТЬЮДЕНТ) ====================
+async function loadRegressionStats() {
+    const countryId = document.getElementById('countrySelect').value;
+    if (!countryId) {
+        alert('Сначала выберите страну');
+        return;
+    }
+    const modelType = document.getElementById('statsModelType').value;
+    
+    const url = `/api/regression/stats/${countryId}?model=${modelType}`;
+    
+    try {
+        const response = await fetch(url);
+        const result = await response.json();
+        if (result.success) {
+            displayRegressionStats(result);
+        } else {
+            alert('Ошибка: ' + (result.error || 'Неизвестная ошибка'));
+            document.getElementById('regressionStatsResult').style.display = 'none';
+        }
+    } catch (error) {
+        alert('Ошибка: ' + error.message);
+    }
+}
+
+function displayRegressionStats(data) {
+    const container = document.getElementById('regressionStatsResult');
+    container.style.display = 'block';
+    
+    const stats = data.statistics;
+    if (!stats) {
+        container.innerHTML = `<div class="error-message">Нет статистических данных для модели ${data.model_type}. Для Ridge/Lasso статистики не рассчитываются.</div>`;
+        return;
+    }
+    
+    // Блок метрик
+    const metricsHtml = `
+        <div class="stats-metrics">
+            <div class="metric-card"><h4>R²</h4><div class="value">${stats.r2?.toFixed(4) || 'N/A'}</div></div>
+            <div class="metric-card"><h4>R² скорректированный</h4><div class="value">${stats.r2_adjusted?.toFixed(4) || 'N/A'}</div></div>
+            <div class="metric-card"><h4>Стандартная ошибка</h4><div class="value">${stats.residual_std_error?.toFixed(2) || 'N/A'}</div></div>
+        </div>
+    `;
+    
+    // Коэффициенты с t-статистиками и p-значениями
+    let coeffHtml = `<div class="stats-coefficients"><h4>📈 Коэффициенты модели (t-критерий Стьюдента)</h4>
+        <table class="data-table"><thead><tr>
+            <th>Переменная</th><th>Коэффициент</th><th>Ст. ошибка</th><th>t-статистика</th><th>p-значение</th><th>Значимость</th>
+        </tr></thead><tbody>`;
+    
+    // intercept
+    const ic = stats.coefficients.intercept;
+    coeffHtml += `<tr>
+        <td><strong>Свободный член</strong></td>
+        <td>${ic.value?.toFixed(4) || 'N/A'}</td>
+        <td>${ic.std_error?.toFixed(4) || 'N/A'}</td>
+        <td>${ic.t_statistic?.toFixed(4) || 'N/A'}</td>
+        <td>${ic.p_value?.toExponential(4) || 'N/A'}</td>
+        <td class="${ic.p_value < 0.05 ? 'significant' : 'insignificant'}">${ic.p_value < 0.05 ? '✓ значим' : '✗ не значим'}</td>
+    </tr>`;
+    
+    // признаки
+    const featureNames = ['Экспорт', 'Импорт', 'Экспорт×Импорт', 'Экспорт²', 'Импорт²'];
+    for (let i = 0; i < stats.coefficients.features.length; i++) {
+        const f = stats.coefficients.features[i];
+        coeffHtml += `<tr>
+            <td>${featureNames[i] || `Признак ${i+1}`}</td>
+            <td>${f.value?.toFixed(4) || 'N/A'}</td>
+            <td>${f.std_error?.toFixed(4) || 'N/A'}</td>
+            <td>${f.t_statistic?.toFixed(4) || 'N/A'}</td>
+            <td>${f.p_value?.toExponential(4) || 'N/A'}</td>
+            <td class="${f.p_value < 0.05 ? 'significant' : 'insignificant'}">${f.p_value < 0.05 ? '✓ значим' : '✗ не значим'}</td>
+        </tr>`;
+    }
+    coeffHtml += `</tbody></table></div>`;
+    
+    // F-тест
+    const f = stats.f_statistic;
+    let fHtml = `<div class="stats-f-test"><h4>📊 F-критерий Фишера (значимость модели)</h4>
+        <div class="info-message">
+            F-статистика: <strong>${f.value?.toFixed(4) || 'N/A'}</strong><br>
+            p-значение: <strong>${f.p_value?.toExponential(4) || 'N/A'}</strong><br>
+            Степени свободы: (${f.df_model}, ${f.df_residual})<br>
+            <span class="${f.p_value < 0.05 ? 'significant' : 'insignificant'}">${f.p_value < 0.05 ? '✓ Модель статистически значима' : '✗ Модель не значима'}</span>
+        </div>
+    </div>`;
+    
+    container.innerHTML = metricsHtml + coeffHtml + fHtml;
+}
+
+// Функция для кнопки статистик внутри блока регрессии ВВП
+function showRegressionStats() {
+    const modelType = document.getElementById('regressionModelType').value;
+    document.getElementById('statsModelType').value = modelType; // синхронизируем
+    loadRegressionStats();
+    // прокрутим к блоку статистик
+    document.getElementById('regressionStatsSection').scrollIntoView({ behavior: 'smooth' });
+}
+
 
 
 
 // ==================== ОБРАБОТЧИКИ СОБЫТИЙ ====================
-
 document.getElementById('countrySelect').addEventListener('change', function() {
     loadData();
     loadDeleteIndicatorsSelect();
     const show = this.value ? 'block' : 'none';
     const forecastSection = document.getElementById('forecastSection');
     const regressionSection = document.getElementById('regressionSection');
+    const irwinSection = document.getElementById('irwinSection');
+    const regressionStatsSection = document.getElementById('regressionStatsSection');
     if (forecastSection) forecastSection.style.display = show;
     if (regressionSection) regressionSection.style.display = show;
+    if (irwinSection) irwinSection.style.display = show;
+    if (regressionStatsSection) regressionStatsSection.style.display = show;
 });
 
 // ==================== ИНИЦИАЛИЗАЦИЯ ====================

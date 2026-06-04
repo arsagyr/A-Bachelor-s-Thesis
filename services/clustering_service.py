@@ -16,7 +16,7 @@ class ClusteringService:
             # Получаем id нужных индикаторов
             ind_repo = IndicatorRepository(conn)
             ind_ids = {}
-            for name in ['export_value', 'import_value', 'gdp_value']:
+            for name in ['export_value', 'import_value', 'gdp_value', 'population_value']:
                 ind = ind_repo.get_by_name(name)
                 if not ind:
                     return {'success': False, 'error': f'Индикатор {name} не найден'}
@@ -49,17 +49,20 @@ class ClusteringService:
                     data_by_country[s.country_id]['import_value'] = s.value
                 elif s.indicator_id == ind_ids['gdp_value']:
                     data_by_country[s.country_id]['gdp_value'] = s.value
+                elif s.indicator_id == ind_ids['population_value']:
+                    data_by_country[s.country_id]['population_value'] = s.value
 
             # Формируем список стран с полными данными
             rows = []
             for cid, vals in data_by_country.items():
-                if all(k in vals for k in ['export_value', 'import_value', 'gdp_value']):
+                if all(k in vals for k in ['export_value', 'import_value', 'gdp_value', 'population_value']):
                     rows.append({
                         'country_id': cid,
                         'year': vals['year'],
                         'export_value': vals['export_value'],
                         'import_value': vals['import_value'],
-                        'gdp_value': vals['gdp_value']
+                        'gdp_value': vals['gdp_value'],
+                        'population_value': vals['population_value']
                     })
 
             if len(rows) < 3:

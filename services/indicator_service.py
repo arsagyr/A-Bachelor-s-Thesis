@@ -95,9 +95,9 @@ class IndicatorService:
             'years_count': len(years),
             'min_year': min(years) if years else None,
             'max_year': max(years) if years else None,
-            'avg_export': safe_avg(export_vals),
-            'avg_import': safe_avg(import_vals),
-            'avg_gdp': safe_avg(gdp_vals)
+            'avg_export': float(safe_avg(export_vals)) if safe_avg(export_vals) is not None else None,
+            'avg_import': float(safe_avg(import_vals)) if safe_avg(import_vals) is not None else None,
+            'avg_gdp': float(safe_avg(gdp_vals)) if safe_avg(gdp_vals) is not None else None
         }
 
     @staticmethod

@@ -48,14 +48,21 @@ brics_countries = {
     'RUS': 'Russia', 
     'IND': 'India',
     'CHN': 'China',
-    'ZAF': 'South Africa'
+    'ZAF': 'South Africa',
+    'EGY': 'Egypt',
+    'ETH': 'Ethiopia',
+    'IRN': 'Iran',
+    'ARE': 'UAE',
+    'SAU': 'Saudi Arabia',
+    'IDN': 'Indonesia'
 }
 
 # Индикаторы Всемирного банка
 indicators = {
     'GDP': 'NY.GDP.MKTP.CD',           # ВВП (в текущих долларах)
     'EXPORT': 'NE.EXP.GNFS.CD',         # Экспорт товаров и услуг
-    'IMPORT': 'NE.IMP.GNFS.CD'          # Импорт товаров и услуг
+    'IMPORT': 'NE.IMP.GNFS.CD',         # Импорт товаров и услуг
+    'POP': 'SP.POP.TOTL'               # 👈 ДОБАВЛЕНО: общая численность населения
 }
 
 years = range(2000, 2024)
@@ -79,13 +86,15 @@ for country_code, country_name in brics_countries.items():
         for year in years:
             value = data.get(year, None)
             if value is not None:
-                # Конвертируем в миллиарды для всех показателей
+                # Конвертируем в удобные единицы
                 if indicator_name == 'GDP':
                     country_data[f"{year}_GDP_bln"] = value / 1e9   # млрд USD
                 elif indicator_name == 'EXPORT':
                     country_data[f"{year}_EXPORT_bln"] = value / 1e9   # млрд USD
-                else:  # IMPORT
+                elif indicator_name == 'IMPORT':
                     country_data[f"{year}_IMPORT_bln"] = value / 1e9   # млрд USD
+                elif indicator_name == 'POP':                         # 👈 НОВЫЙ БЛОК
+                    country_data[f"{year}_POP_mil"] = value / 1e6     # млн человек
     
     all_data.append(country_data)
     time.sleep(0.5)  # Небольшая пауза между запросами
@@ -102,7 +111,8 @@ for country in all_data:
             'Год': year,
             'ВВП_млрд': country.get(f"{year}_GDP_bln", None),
             'Экспорт_млрд': country.get(f"{year}_EXPORT_bln", None),
-            'Импорт_млрд': country.get(f"{year}_IMPORT_bln", None)
+            'Импорт_млрд': country.get(f"{year}_IMPORT_bln", None),
+            'Население_млн': country.get(f"{year}_POP_mil", None)   # 👈 ДОБАВЛЕНО
         }
         df_list.append(row)
 
@@ -122,8 +132,8 @@ print(f"🌍 Стран: {len(brics_countries)}")
 print(f"📅 Период: 2000-2023")
 
 # Показываем статистику по полноте данных
-print("\n📊 Статистика по данным (в млрд USD):")
-for indicator in ['ВВП_млрд', 'Экспорт_млрд', 'Импорт_млрд']:
+print("\n📊 Статистика по данным:")
+for indicator in ['ВВП_млрд', 'Экспорт_млрд', 'Импорт_млрд', 'Население_млн']:   # 👈 ДОБАВЛЕНО
     non_null = df[indicator].notna().sum()
     total = len(df)
     print(f"  - {indicator}: {non_null}/{total} ({non_null/total*100:.1f}%)")
@@ -133,9 +143,8 @@ print("\n🔍 Первые 10 строк данных:")
 print(df.head(10))
 
 # Дополнительно: сводная статистика по 2023 году
-print("\n📋 Данные за 2023 год (в млрд USD):")
-df_2023 = df[df['Год'] == 2023]
-print(df_2023.to_string(index=False))
+print("\n📋 Данные за 2023 год:")
+print(df[df['Год'] == 2023].to_string(index=False))
 
 # Дополнительная статистика
 print("\n📈 Сводная статистика за весь период:")
@@ -146,3 +155,4 @@ for country in brics_countries.values():
         print(f"  Средний ВВП: {country_data['ВВП_млрд'].mean():.2f} млрд USD")
         print(f"  Средний экспорт: {country_data['Экспорт_млрд'].mean():.2f} млрд USD")
         print(f"  Средний импорт: {country_data['Импорт_млрд'].mean():.2f} млрд USD")
+        print(f"  Среднее население: {country_data['Население_млн'].mean():.2f} млн чел.")   # 👈 ДОБАВЛЕНО

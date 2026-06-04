@@ -4,7 +4,8 @@
 
 import numpy as np
 from typing import List, Dict, Any
-from calculations.metrics import  calculate_metrics
+from sklearn.linear_model import Ridge, Lasso
+from calculations.metrics import calculate_metrics
 
 AVAILABLE_MODELS = {
     'linear': 'Линейная регрессия',
@@ -13,29 +14,6 @@ AVAILABLE_MODELS = {
     'ridge': 'Ridge регрессия',
     'lasso': 'Lasso регрессия'
 }
-
-
-# def calculate_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
-#     """Расчёт метрик качества"""
-#     n = len(y_true)
-#     ss_res = np.sum((y_true - y_pred) ** 2)
-#     ss_tot = np.sum((y_true - np.mean(y_true)) ** 2)
-#     r2 = 1 - (ss_res / ss_tot) if ss_tot != 0 else 0
-#     rmse = np.sqrt(np.mean((y_true - y_pred) ** 2))
-#     mae = np.mean(np.abs(y_true - y_pred))
-    
-#     mask = y_true != 0
-#     if np.any(mask):
-#         mape = np.mean(np.abs((y_true[mask] - y_pred[mask]) / y_true[mask])) * 100
-#     else:
-#         mape = 100.0
-    
-#     return {
-#         'r2': float(r2), 
-#         'rmse': float(rmse), 
-#         'mae': float(mae), 
-#         'mape': float(mape)
-#     }
 
 
 def linear_regression_ols(x: np.ndarray, y: np.ndarray) -> tuple:
@@ -208,32 +186,34 @@ def exponential_trend(series: List[float], steps: int = 5) -> Dict[str, Any]:
 
 
 def ridge_trend(series: List[float], steps: int = 5, alpha: float = 1.0) -> Dict[str, Any]:
-    """Ridge регрессия (L2-регуляризация)"""
+    """
+    Ridge регрессия (L2-регуляризация) с использованием sklearn
+    
+    Args:
+        series: список исторических значений
+        steps: количество шагов прогноза
+        alpha: коэффициент регуляризации (чем больше, тем сильнее сжатие коэффициентов)
+    """
     if len(series) < 3:
         return {'error': 'Недостаточно данных', 'forecast': []}
     
     y = np.array([float(x) for x in series])
-    x = np.arange(1, len(y) + 1)
+    x = np.arange(1, len(y) + 1).reshape(-1, 1)  # sklearn ожидает 2D массив
     
-    X_with_intercept = np.column_stack([np.ones(len(x)), x])
-    n_features = X_with_intercept.shape[1]
+    # Обучаем модель Ridge
+    model = Ridge(alpha=alpha, fit_intercept=True)
+    model.fit(x, y)
     
-    XTX = X_with_intercept.T @ X_with_intercept
-    ridge_matrix = XTX + alpha * np.eye(n_features)
+    intercept = model.intercept_
+    slope = model.coef_[0]
     
-    try:
-        coefficients = np.linalg.solve(ridge_matrix, X_with_intercept.T @ y)
-    except np.linalg.LinAlgError:
-        coefficients = np.linalg.pinv(ridge_matrix) @ (X_with_intercept.T @ y)
-    
-    intercept = coefficients[0]
-    slope = coefficients[1] if len(coefficients) > 1 else 0
-    
+    # Прогноз на будущие годы
     last_x = len(y)
-    future_x = np.arange(last_x + 1, last_x + steps + 1)
-    forecast_values = [intercept + slope * t for t in future_x]
+    future_x = np.arange(last_x + 1, last_x + steps + 1).reshape(-1, 1)
+    forecast_values = model.predict(future_x).tolist()
     
-    y_pred = intercept + slope * x
+    # Предсказания на исторических данных
+    y_pred = model.predict(x)
     metrics = calculate_metrics(y, y_pred)
     
     formula = f"y = {intercept:.4f} + {slope:.4f}·x (Ridge, α={alpha})"
@@ -256,8 +236,53 @@ def ridge_trend(series: List[float], steps: int = 5, alpha: float = 1.0) -> Dict
 
 
 def lasso_trend(series: List[float], steps: int = 5, alpha: float = 1.0) -> Dict[str, Any]:
-    """Lasso регрессия (L1-регуляризация)"""
-    return ridge_trend(series, steps, alpha)
+    """
+    Lasso регрессия (L1-регуляризация) с использованием sklearn
+    
+    Args:
+        series: список исторических значений
+        steps: количество шагов прогноза
+        alpha: коэффициент регуляризации (чем больше, тем больше коэффициентов обнуляется)
+    """
+    if len(series) < 3:
+        return {'error': 'Недостаточно данных', 'forecast': []}
+    
+    y = np.array([float(x) for x in series])
+    x = np.arange(1, len(y) + 1).reshape(-1, 1)
+    
+    # Обучаем модель Lasso
+    model = Lasso(alpha=alpha, fit_intercept=True, max_iter=10000)
+    model.fit(x, y)
+    
+    intercept = model.intercept_
+    slope = model.coef_[0]
+    
+    # Прогноз на будущие годы
+    last_x = len(y)
+    future_x = np.arange(last_x + 1, last_x + steps + 1).reshape(-1, 1)
+    forecast_values = model.predict(future_x).tolist()
+    
+    # Предсказания на исторических данных
+    y_pred = model.predict(x)
+    metrics = calculate_metrics(y, y_pred)
+    
+    formula = f"y = {intercept:.4f} + {slope:.4f}·x (Lasso, α={alpha})"
+    
+    return {
+        'success': True,
+        'model_type': 'lasso',
+        'model_name': f"{AVAILABLE_MODELS['lasso']} (α={alpha})",
+        'forecast': forecast_values,
+        'metrics': metrics,
+        'r2': metrics['r2'],
+        'rmse': metrics['rmse'],
+        'mae': metrics['mae'],
+        'mape': metrics['mape'],
+        'formula': formula,
+        'intercept': float(intercept),
+        'slope': float(slope),
+        'alpha': alpha
+    }
 
 
 def auto_regression_forecast(series: List[float], steps: int = 5, model_type: str = 'linear', **kwargs) -> Dict[str, Any]:
@@ -331,4 +356,87 @@ def compare_auto_regression_models(series: List[float], steps: int = 5) -> Dict[
         'best_model': best_model,
         'best_model_name': results.get(best_model, {}).get('model_name', 'N/A'),
         'best_r2': best_r2
+    }
+
+def irwin_criterion(series: List[float], threshold: float = 3.0) -> Dict[str, Any]:
+    """
+    Поиск аномальных наблюдений во временном ряду по критерию Ирвина.
+    
+    Критерий Ирвина проверяет гипотезу об отсутствии грубых ошибок (выбросов).
+    Вычисляется λ_t = |x_t - x_{t-1}| / σ_Δ, где σ_Δ — СКО разностей соседних уровней.
+    Если λ_t > threshold, то наблюдение считается аномальным.
+    
+    Args:
+        series: список исторических значений
+        threshold: пороговое значение (обычно 3 для уровня значимости 0.05)
+    
+    Returns:
+        словарь с результатами: аномальные индексы, значения, λ-статистики
+    """
+    if len(series) < 3:
+        return {'error': 'Недостаточно данных для критерия Ирвина (нужно минимум 3 точки)'}
+    
+    y = np.array([float(x) for x in series])
+    n = len(y)
+    
+    # Разности между соседними уровнями
+    diffs = np.diff(y)
+    sigma_diff = np.std(diffs, ddof=1)  # несмещённое СКО
+    
+    if sigma_diff == 0:
+        return {'error': 'Нулевое СКО разностей, все разности одинаковы'}
+    
+    # Расчёт λ для каждой точки (начиная со 2-й)
+    lambda_vals = np.abs(diffs) / sigma_diff
+    is_outlier = lambda_vals > threshold
+    
+    outliers = []
+    for i in range(1, n):
+        if is_outlier[i-1]:
+            outliers.append({
+                'index': i,  # 0-based индекс в series
+                'value': float(y[i]),
+                'lambda': float(lambda_vals[i-1]),
+                'prev_value': float(y[i-1])
+            })
+    
+    return {
+        'success': True,
+        'threshold': threshold,
+        'sigma_diff': float(sigma_diff),
+        'outliers': outliers,
+        'outlier_count': len(outliers),
+        'all_lambda': lambda_vals.tolist()
+    }
+
+def t_test_slope(series: List[float], alpha: float = 0.05) -> Dict[str, Any]:
+    """
+    Проверка значимости наклона линейного тренда по критерию Стьюдента.
+    """
+    if len(series) < 3:
+        return {'error': 'Недостаточно данных'}
+    
+    y = np.array([float(x) for x in series])
+    x = np.arange(1, len(y) + 1)
+    n = len(x)
+    
+    slope, intercept = linear_regression_ols(x, y)
+    y_pred = intercept + slope * x
+    residuals = y - y_pred
+    residual_var = np.sum(residuals ** 2) / (n - 2)
+    se_slope = np.sqrt(residual_var / np.sum((x - np.mean(x)) ** 2))
+    
+    t_stat = slope / se_slope
+    # Двусторонний тест
+    from scipy import stats
+    p_value = 2 * (1 - stats.t.cdf(abs(t_stat), df=n-2))
+    significant = p_value < alpha
+    
+    return {
+        'slope': slope,
+        'std_error': se_slope,
+        't_statistic': t_stat,
+        'p_value': p_value,
+        'significant': significant,
+        'alpha': alpha
     }

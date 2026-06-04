@@ -270,3 +270,54 @@ def delete_country_indicators(country_id):
         print(f"Error: {e}")
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+    
+    # ==================== КРИТЕРИЙ ИРВИНА ====================
+
+@indicators_bp.route('/api/irwin/<int:country_id>/<indicator>', methods=['GET'])
+def check_irwin_criterion(country_id, indicator):
+    """
+    Проверка временного ряда на аномалии по критерию Ирвина.
+    
+    Args:
+        country_id: ID страны
+        indicator: 'export', 'import' или 'gdp'
+    """
+    try:
+        # Преобразуем indicator в полное имя поля
+        if indicator not in ['export', 'import', 'gdp']:
+            return jsonify({'error': 'Неверный тип показателя. Допустимые: export, import, gdp'}), 400
+        
+        indicator_field = f'{indicator}_value'
+        threshold = request.args.get('threshold', 3.0, type=float)
+        
+        result = ForecastService.check_irwin(country_id, indicator_field, threshold)
+        
+        if result.get('success'):
+            return jsonify(result)
+        return jsonify({'error': result.get('error', 'Ошибка проверки по Ирвину')}), 400
+    except Exception as e:
+        print(f"Error in irwin: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@indicators_bp.route('/api/regression/stats/<int:country_id>', methods=['GET'])
+def get_regression_statistics(country_id):
+    """
+    Расчёт статистик значимости для регрессионной модели ВВП от экспорта и импорта.
+    Возвращает t-статистики для коэффициентов, F-статистику для модели,
+    p-значения, скорректированный R².
+    """
+    try:
+        model_type = request.args.get('model', 'linear')
+        if model_type not in ['linear', 'ridge', 'lasso']:
+            model_type = 'linear'
+        
+        result = RegressionService.get_regression_statistics(country_id, model_type)
+        
+        if result.get('success'):
+            return jsonify(result)
+        return jsonify({'error': result.get('error', 'Ошибка расчёта статистик')}), 400
+    except Exception as e:
+        print(f"Error in regression stats: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
