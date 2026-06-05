@@ -2,16 +2,11 @@ import requests
 import pandas as pd
 from datetime import datetime
 import time
+import requests
 
-def get_wb_data(indicator, country_code, start_year=2000, end_year=2023):
+def get_wb_data(indicator, country_code, start_year=2000, end_year=2023, max_retries=3):
     """
-    Получение данных из World Bank API
-    
-    Parameters:
-    - indicator: код индикатора Всемирного банка
-    - country_code: код страны (BRA, RUS, IND, CHN, ZAF)
-    - start_year: начальный год
-    - end_year: конечный год
+    Получение данных из World Bank API с повторными попытками.
     """
     url = f"http://api.worldbank.org/v2/country/{country_code}/indicator/{indicator}"
     params = {
@@ -20,27 +15,40 @@ def get_wb_data(indicator, country_code, start_year=2000, end_year=2023):
         'date': f'{start_year}:{end_year}'
     }
     
-    try:
-        response = requests.get(url, params=params, timeout=30)
-        response.raise_for_status()
-        data = response.json()
+    for attempt in range(max_retries):
+        try:
+            response = requests.get(url, params=params, timeout=60)  # увеличен таймаут
+            if response.status_code == 400:
+                # Для 400 считаем, что данных нет (некоторые индикаторы отсутствуют для страны)
+                print(f"⚠️  Данные по {indicator} для {country_code} отсутствуют (HTTP 400)")
+                return {}
+            response.raise_for_status()
+            data = response.json()
+            
+            if len(data) < 2 or not data[1]:
+                return {}
+            
+            result = {}
+            for item in data[1]:
+                year = item['date']
+                value = item['value']
+                if value is not None and value != "..":
+                    try:
+                        result[int(year)] = float(value)
+                    except (ValueError, TypeError):
+                        continue
+            return result
         
-        if len(data) < 2 or not data[1]:
-            return {}
-        
-        # Парсим данные
-        result = {}
-        for item in data[1]:
-            year = item['date']
-            value = item['value']
-            if value is not None:
-                result[int(year)] = float(value)
-        
-        return result
+        except requests.exceptions.Timeout:
+            print(f"  Таймаут ({attempt+1}/{max_retries}) для {indicator} {country_code}, повтор через {2**attempt} сек...")
+            time.sleep(2**attempt)
+        except requests.exceptions.RequestException as e:
+            print(f"  Ошибка ({attempt+1}/{max_retries}): {e}")
+            if attempt == max_retries-1:
+                return {}
+            time.sleep(2**attempt)
     
-    except Exception as e:
-        print(f"Ошибка при загрузке {indicator} для {country_code}: {e}")
-        return {}
+    return {}
 
 # Определяем страны БРИКС (оригинальный состав до 2024)
 brics_countries = {
@@ -68,43 +76,52 @@ indicators = {
 years = range(2000, 2024)
 all_data = []
 
-print("🚀 Начинаем сбор данных из World Bank API...")
-print("-" * 60)
-
-# Собираем данные для каждой страны
 for country_code, country_name in brics_countries.items():
-    print(f"\n📊 Загружаем данные для {country_name} ({country_code})...")
-    
-    country_data = {'Country': country_name}
-    
-    for indicator_name, indicator_code in indicators.items():
-        print(f"  - {indicator_name}...", end=" ")
-        data = get_wb_data(indicator_code, country_code, 2000, 2023)
-        print(f"✅ ({len(data)} лет)")
+    try:
+        print(f"\n📊 Загружаем данные для {country_name} ({country_code})...")
+        country_data = {'Country': country_name}
         
-        # Сохраняем данные для каждого года
-        for year in years:
-            value = data.get(year, None)
-            if value is not None:
-                # Конвертируем в удобные единицы
-                if indicator_name == 'GDP':
-                    country_data[f"{year}_GDP_bln"] = value / 1e9   # млрд USD
-                elif indicator_name == 'EXPORT':
-                    country_data[f"{year}_EXPORT_bln"] = value / 1e9   # млрд USD
-                elif indicator_name == 'IMPORT':
-                    country_data[f"{year}_IMPORT_bln"] = value / 1e9   # млрд USD
-                elif indicator_name == 'POP':                         # 👈 НОВЫЙ БЛОК
-                    country_data[f"{year}_POP_mil"] = value / 1e6     # млн человек
+        for indicator_name, indicator_code in indicators.items():
+            print(f"  - {indicator_name}...", end=" ", flush=True)
+            data = get_wb_data(indicator_code, country_code, 2000, 2023)  # ваша функция с retry
+            print(f"✅ ({len(data)} лет)" if data else "⚠️ (нет данных)")
+            
+            for year in years:
+                value = data.get(year)
+                if value is not None:
+                    try:
+                        if indicator_name == 'GDP':
+                            country_data[f"{year}_GDP_bln"] = value / 1e9
+                        elif indicator_name == 'EXPORT':
+                            country_data[f"{year}_EXPORT_bln"] = value / 1e9
+                        elif indicator_name == 'IMPORT':
+                            country_data[f"{year}_IMPORT_bln"] = value / 1e9
+                        elif indicator_name == 'POP':
+                            country_data[f"{year}_POP_mil"] = value / 1e6
+                    except (TypeError, ValueError) as e:
+                        print(f"      Ошибка преобразования года {year}: {e}")
+            
+            time.sleep(1)  # пауза между индикаторами
+        
+        all_data.append(country_data)
+        print(f"  ✅ Данные для {country_name} добавлены")
+        time.sleep(2)
     
-    all_data.append(country_data)
-    time.sleep(0.5)  # Небольшая пауза между запросами
+    except Exception as e:
+        print(f"  ❌ Критическая ошибка при обработке {country_name}: {e}")
+        continue
 
-# Создаем DataFrame
+# Диагностика перед созданием DataFrame
+print(f"\n📦 Собрано данных для {len(all_data)} стран из {len(brics_countries)}")
+if not all_data:
+    raise RuntimeError("Нет данных ни для одной страны. Проверьте соединение и индикаторы.")
+
 df_list = []
 for country in all_data:
-    country_name = country['Country']
-    
-    # Извлекаем данные по годам
+    country_name = country.get('Country')
+    if not country_name:
+        print(f"⚠️ Пропущена запись без ключа 'Country': {country}")
+        continue
     for year in years:
         row = {
             'Страна': country_name,
@@ -112,11 +129,12 @@ for country in all_data:
             'ВВП_млрд': country.get(f"{year}_GDP_bln", None),
             'Экспорт_млрд': country.get(f"{year}_EXPORT_bln", None),
             'Импорт_млрд': country.get(f"{year}_IMPORT_bln", None),
-            'Население_млн': country.get(f"{year}_POP_mil", None)   # 👈 ДОБАВЛЕНО
+            'Население_млн': country.get(f"{year}_POP_mil", None)
         }
         df_list.append(row)
 
 df = pd.DataFrame(df_list)
+print(f"📊 Итоговый DataFrame: {df.shape[0]} строк, колонки: {df.columns.tolist()}")
 
 # Сортируем данные
 df = df.sort_values(['Страна', 'Год']).reset_index(drop=True)

@@ -1,5 +1,5 @@
 from calculations.auto_regression import auto_regression_forecast, linear_trend, compare_auto_regression_models
-from calculations.regression_calc import predict_gdp_by_regression
+from calculations.regression_calc import predict_gdp_by_regression, prepare_regression_features
 from calculations.clustering_calc import ClusteringCalc
 from calculations.metrics import  calculate_metrics
 
@@ -9,5 +9,7 @@ __all__ = [
     'compare_auto_regression_models',
     'predict_gdp_by_regression',
     'ClusteringCalc',
-    'calculate_metrics'
+    'calculate_metrics',
+    ' prepare_regression',
+    'prepare_regression_features',
 ]
