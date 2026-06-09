@@ -4,7 +4,7 @@ from datetime import datetime
 import time
 import requests
 
-def get_wb_data(indicator, country_code, start_year=2000, end_year=2023, max_retries=3):
+def get_wb_data(indicator, country_code, start_year=2000, end_year=2026, max_retries=3):
     """
     Получение данных из World Bank API с повторными попытками.
     """
@@ -50,7 +50,7 @@ def get_wb_data(indicator, country_code, start_year=2000, end_year=2023, max_ret
     
     return {}
 
-# Определяем страны БРИКС (оригинальный состав до 2024)
+# Определяем страны БРИКС (оригинальный состав до 2026)
 brics_countries = {
     'BRA': 'Brazil',
     'RUS': 'Russia', 
@@ -73,7 +73,7 @@ indicators = {
     'POP': 'SP.POP.TOTL'               # 👈 ДОБАВЛЕНО: общая численность населения
 }
 
-years = range(2000, 2024)
+years = range(2000, 2026)
 all_data = []
 
 for country_code, country_name in brics_countries.items():
@@ -83,7 +83,7 @@ for country_code, country_name in brics_countries.items():
         
         for indicator_name, indicator_code in indicators.items():
             print(f"  - {indicator_name}...", end=" ", flush=True)
-            data = get_wb_data(indicator_code, country_code, 2000, 2023)  # ваша функция с retry
+            data = get_wb_data(indicator_code, country_code, 2000, 2026)  # ваша функция с retry
             print(f"✅ ({len(data)} лет)" if data else "⚠️ (нет данных)")
             
             for year in years:
@@ -147,7 +147,7 @@ print("\n" + "=" * 60)
 print(f"✅ Готово! Данные сохранены в файл: {csv_filename}")
 print(f"📈 Всего записей: {len(df)}")
 print(f"🌍 Стран: {len(brics_countries)}")
-print(f"📅 Период: 2000-2023")
+print(f"📅 Период: 2000-2026")
 
 # Показываем статистику по полноте данных
 print("\n📊 Статистика по данным:")
@@ -160,9 +160,9 @@ for indicator in ['ВВП_млрд', 'Экспорт_млрд', 'Импорт_м
 print("\n🔍 Первые 10 строк данных:")
 print(df.head(10))
 
-# Дополнительно: сводная статистика по 2023 году
-print("\n📋 Данные за 2023 год:")
-print(df[df['Год'] == 2023].to_string(index=False))
+# Дополнительно: сводная статистика по 2026 году
+print("\n📋 Данные за 2026 год:")
+print(df[df['Год'] == 2026].to_string(index=False))
 
 # Дополнительная статистика
 print("\n📈 Сводная статистика за весь период:")
