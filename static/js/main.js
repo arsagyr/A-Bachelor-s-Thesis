@@ -11,6 +11,11 @@ let clusterScatterChart = null;
 async function loadCountries() {
     try {
         const response = await fetch('/api/countries');
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         const countries = await response.json();
         const select = document.getElementById('countrySelect');
         select.innerHTML = '<option value="">🌍 Все страны</option>';
@@ -27,6 +32,18 @@ async function loadCountries() {
         loadClusteringYears();
     } catch (error) {
         console.error('Ошибка загрузки стран:', error);
+        const select = document.getElementById('countrySelect');
+        select.innerHTML = '<option value="">⚠️ Ошибка загрузки</option>';
+        
+        const statsContainer = document.getElementById('statsContainer');
+        if (statsContainer) {
+            statsContainer.innerHTML = `
+                <div class="error-message" style="grid-column: 1/-1; text-align: center;">
+                    <strong>❌ Ошибка подключения к серверу</strong><br>
+                    Убедитесь, что сервер запущен: <code>python app.py</code>
+                </div>
+            `;
+        }
     }
 }
 
@@ -44,12 +61,17 @@ async function loadData() {
     
     try {
         const response = await fetch(url);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         const data = await response.json();
         
         if (!data || data.length === 0) {
             document.getElementById('trendEmptyMessage').style.display = 'block';
             if (trendChart) trendChart.destroy();
-            document.getElementById('statsContainer').innerHTML = '';
+            document.getElementById('statsContainer').innerHTML = '<div class="info-message">Нет данных для отображения. Загрузите данные через CSV.</div>';
             return;
         }
         
@@ -157,27 +179,37 @@ async function loadData() {
         }
     } catch (error) {
         console.error('Ошибка загрузки данных:', error);
+        document.getElementById('trendEmptyMessage').style.display = 'block';
+        document.getElementById('statsContainer').innerHTML = `
+            <div class="error-message">
+                <strong>❌ Ошибка загрузки данных:</strong><br>
+                ${error.message}
+            </div>
+        `;
     }
 }
 
 // ==================== ПРОГНОЗИРОВАНИЕ ВРЕМЕННЫХ РЯДОВ ====================
 
 // Показ/скрытие дополнительных параметров
-document.getElementById('forecastModel').addEventListener('change', function() {
-    const degreeControl = document.getElementById('degreeControl');
-    const alphaControl = document.getElementById('alphaControl');
-    
-    if (this.value === 'polynomial') {
-        if (degreeControl) degreeControl.style.display = 'block';
-        if (alphaControl) alphaControl.style.display = 'none';
-    } else if (this.value === 'ridge' || this.value === 'lasso') {
-        if (degreeControl) degreeControl.style.display = 'none';
-        if (alphaControl) alphaControl.style.display = 'block';
-    } else {
-        if (degreeControl) degreeControl.style.display = 'none';
-        if (alphaControl) alphaControl.style.display = 'none';
-    }
-});
+const forecastModel = document.getElementById('forecastModel');
+if (forecastModel) {
+    forecastModel.addEventListener('change', function() {
+        const degreeControl = document.getElementById('degreeControl');
+        const alphaControl = document.getElementById('alphaControl');
+        
+        if (this.value === 'polynomial') {
+            if (degreeControl) degreeControl.style.display = 'block';
+            if (alphaControl) alphaControl.style.display = 'none';
+        } else if (this.value === 'ridge' || this.value === 'lasso') {
+            if (degreeControl) degreeControl.style.display = 'none';
+            if (alphaControl) alphaControl.style.display = 'block';
+        } else {
+            if (degreeControl) degreeControl.style.display = 'none';
+            if (alphaControl) alphaControl.style.display = 'none';
+        }
+    });
+}
 
 // Загрузка прогноза
 async function loadForecast() {
@@ -204,16 +236,25 @@ async function loadForecast() {
             url += `&alpha=${alpha}`;
         }
         
+        console.log('Fetching forecast from:', url);
         const response = await fetch(url);
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        }
+        
         const result = await response.json();
+        console.log('Forecast result:', result);
         
         if (result.success) {
             displayForecast(result);
         } else {
-            alert('Ошибка: ' + result.error);
+            alert('Ошибка: ' + (result.error || 'Неизвестная ошибка'));
             document.getElementById('forecastResult').style.display = 'none';
         }
     } catch (error) {
+        console.error('Forecast error:', error);
         alert('Ошибка: ' + error.message);
         document.getElementById('forecastResult').style.display = 'none';
     } finally {
@@ -222,9 +263,13 @@ async function loadForecast() {
 }
 
 // Отображение прогноза
-// Отображение прогноза
 function displayForecast(forecast) {
-    document.getElementById('forecastResult').style.display = 'block';
+    console.log('Displaying forecast:', forecast);
+    
+    const resultDiv = document.getElementById('forecastResult');
+    if (!resultDiv) return;
+    
+    resultDiv.style.display = 'block';
     
     const metrics = forecast.metrics || {};
     const unit = forecast.unit || 'млрд USD';
@@ -234,40 +279,64 @@ function displayForecast(forecast) {
         modelInfo = `🏆 Лучшая: ${forecast.best_model_name} (R² = ${forecast.best_r2?.toFixed(4)})`;
     }
     
-    // Три основные метрики: R², RMSE, MAE
     let metricsHtml = `
-        <div class="metric-card">
-            <h4>📊 Модель</h4>
-            <div class="value">${modelInfo}</div>
-        </div>
-        <div class="metric-card">
-            <h4>📈 R²</h4>
-            <div class="value">${metrics.r2 ? metrics.r2.toFixed(4) : 'N/A'}</div>
-        </div>
-        <div class="metric-card">
-            <h4>📉 RMSE</h4>
-            <div class="value">${metrics.rmse ? metrics.rmse.toFixed(2) : 'N/A'} ${unit}</div>
-        </div>
-        <div class="metric-card">
-            <h4>📊 MAE</h4>
-            <div class="value">${metrics.mae ? metrics.mae.toFixed(2) : 'N/A'} ${unit}</div>
-        </div>
+        <div class="forecast-metrics">
+            <div class="metric-card">
+                <h4>📊 Модель</h4>
+                <div class="value">${escapeHtml(modelInfo)}</div>
+            </div>
+            <div class="metric-card">
+                <h4>📈 R²</h4>
+                <div class="value">${metrics.r2 ? metrics.r2.toFixed(4) : 'N/A'}</div>
+            </div>
+            <div class="metric-card">
+                <h4>📉 RMSE</h4>
+                <div class="value">${metrics.rmse ? metrics.rmse.toFixed(2) : 'N/A'} ${unit}</div>
+            </div>
+            <div class="metric-card">
+                <h4>📊 MAE</h4>
+                <div class="value">${metrics.mae ? metrics.mae.toFixed(2) : 'N/A'} ${unit}</div>
+            </div>
     `;
     
-    document.getElementById('forecastMetrics').innerHTML = metricsHtml;
+    if (forecast.trend_significance) {
+        const ts = forecast.trend_significance;
+        const significantText = ts.significant ? '✅ значим' : '❌ не значим';
+        metricsHtml += `
+            <div class="metric-card">
+                <h4>📈 t-статистика</h4>
+                <div class="value">${ts.t_statistic?.toFixed(4) || 'N/A'}</div>
+            </div>
+            <div class="metric-card">
+                <h4>🎯 p-значение</h4>
+                <div class="value">${ts.p_value?.toExponential(4) || 'N/A'}</div>
+            </div>
+            <div class="metric-card">
+                <h4>📊 Тренд</h4>
+                <div class="value">${significantText}</div>
+            </div>
+        `;
+    }
+    metricsHtml += `</div>`;
     
-    // Формула
-    const formulaHtml = `<div class="formula">${forecast.formula || 'Формула не доступна'}</div>`;
-    document.getElementById('forecastFormula').innerHTML = formulaHtml;
+    const metricsContainer = document.getElementById('forecastMetrics');
+    if (metricsContainer) metricsContainer.innerHTML = metricsHtml;
     
-    // График
+    const formulaContainer = document.getElementById('forecastFormula');
+    if (formulaContainer) {
+        formulaContainer.innerHTML = `<div class="formula">${escapeHtml(forecast.formula || 'Формула не доступна')}</div>`;
+    }
+    
     if (forecastChart) forecastChart.destroy();
     
-    if (!forecast.historical_years || !forecast.forecast_years) return;
+    if (!forecast.historical_years || !forecast.forecast_years) {
+        console.warn('Missing years data');
+        return;
+    }
     
     const allYears = [...forecast.historical_years, ...forecast.forecast_years];
     const historicalData = [...forecast.historical_values, ...Array(forecast.forecast_years.length).fill(null)];
-    const forecastData = [...Array(forecast.historical_years.length).fill(null), ...forecast.forecast];
+    const forecastData = [...Array(forecast.historical_years.length).fill(null), ...(forecast.forecast || [])];
     const modelPredictions = forecast.model_predictions || [];
     
     const datasets = [
@@ -311,66 +380,53 @@ function displayForecast(forecast) {
         fill: false
     });
     
-    forecastChart = new Chart(document.getElementById('forecastChart'), {
-        type: 'line',
-        data: { labels: allYears, datasets: datasets },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            interaction: { mode: 'index', intersect: false },
-            plugins: {
-                legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 10 } },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return context.dataset.label + ': ' + 
-                                   new Intl.NumberFormat('ru-RU').format(context.parsed.y) + ' ' + unit;
+    const chartCanvas = document.getElementById('forecastChart');
+    if (chartCanvas) {
+        forecastChart = new Chart(chartCanvas, {
+            type: 'line',
+            data: { labels: allYears, datasets: datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 10 } },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ': ' + 
+                                       new Intl.NumberFormat('ru-RU').format(context.parsed.y) + ' ' + unit;
+                            }
                         }
                     }
-                }
-            },
-            scales: {
-                y: { 
-                    beginAtZero: true, 
-                    title: { display: true, text: unit },
-                    ticks: { callback: (value) => new Intl.NumberFormat('ru-RU').format(value) }
                 },
-                x: { title: { display: true, text: 'Год' } }
+                scales: {
+                    y: { 
+                        beginAtZero: true, 
+                        title: { display: true, text: unit },
+                        ticks: { callback: (value) => new Intl.NumberFormat('ru-RU').format(value) }
+                    },
+                    x: { title: { display: true, text: 'Год' } }
+                }
             }
-        }
-    });
-    
-    // Таблица прогнозов
-    let tableHtml = `<td><thead><tr><th>Год</th><th>Прогноз (${unit})</th></tr></thead><tbody>`;
-    for (let i = 0; i < forecast.forecast.length; i++) {
-        tableHtml += `<tr>
-            <td><strong>${forecast.forecast_years[i]}</strong></td>
-            <td>${forecast.forecast[i].toFixed(2)}</div>
-        </tr>`;
+        });
     }
-    tableHtml += '</tbody></table>';
-    document.getElementById('forecastTable').innerHTML = tableHtml;
+    
+    const tableContainer = document.getElementById('forecastTable');
+    if (tableContainer && forecast.forecast && forecast.forecast_years) {
+        let tableHtml = `<table><thead><tr><th>Год</th><th>Прогноз (${unit})</th></tr></thead><tbody>`;
+        for (let i = 0; i < forecast.forecast.length; i++) {
+            tableHtml += `<tr>
+                <td><strong>${forecast.forecast_years[i]}</strong></td>
+                <td>${forecast.forecast[i].toFixed(2)}</td>
+            </tr>`;
+        }
+        tableHtml += '</tbody></table>';
+        tableContainer.innerHTML = tableHtml;
+    }
 }
 
 // ==================== РЕГРЕССИЯ ВВП ====================
-
-// Показ/скрытие параметров регрессии
-document.getElementById('regressionModelType').addEventListener('change', function() {
-    const degreeControl = document.getElementById('regressionDegreeControl');
-    const alphaControl = document.getElementById('regressionAlphaControl');
-    
-    if (this.value === 'polynomial') {
-        if (degreeControl) degreeControl.style.display = 'block';
-        if (alphaControl) alphaControl.style.display = 'none';
-    } else if (this.value === 'ridge' || this.value === 'lasso') {
-        if (degreeControl) degreeControl.style.display = 'none';
-        if (alphaControl) alphaControl.style.display = 'block';
-    } else {
-        if (degreeControl) degreeControl.style.display = 'none';
-        if (alphaControl) alphaControl.style.display = 'none';
-    }
-});
-
 
 // Загрузка регрессионного прогноза ВВП
 async function loadGDPRegressionForecast() {
@@ -407,40 +463,38 @@ async function loadGDPRegressionForecast() {
     }
 }
 
-
 function displayRegressionForecast(forecast) {
     document.getElementById('regressionForecastResult').style.display = 'block';
     
     const metrics = forecast.metrics || {};
     const unit = 'млрд USD';
     
-    // Три основные метрики: R², RMSE, MAE
     let metricsHtml = `
-        <div class="metric-card">
-            <h4>📊 Модель</h4>
-            <div class="value">${forecast.model_type}</div>
-        </div>
-        <div class="metric-card">
-            <h4>📈 R²</h4>
-            <div class="value">${metrics.r2 ? metrics.r2.toFixed(4) : 'N/A'}</div>
-        </div>
-        <div class="metric-card">
-            <h4>📉 RMSE</h4>
-            <div class="value">${metrics.rmse ? metrics.rmse.toFixed(2) : 'N/A'} ${unit}</div>
-        </div>
-        <div class="metric-card">
-            <h4>📊 MAE</h4>
-            <div class="value">${metrics.mae ? metrics.mae.toFixed(2) : 'N/A'} ${unit}</div>
+        <div class="forecast-metrics">
+            <div class="metric-card">
+                <h4>📊 Модель</h4>
+                <div class="value">${forecast.model_type}</div>
+            </div>
+            <div class="metric-card">
+                <h4>📈 R²</h4>
+                <div class="value">${metrics.r2 ? metrics.r2.toFixed(4) : 'N/A'}</div>
+            </div>
+            <div class="metric-card">
+                <h4>📉 RMSE</h4>
+                <div class="value">${metrics.rmse ? metrics.rmse.toFixed(2) : 'N/A'} ${unit}</div>
+            </div>
+            <div class="metric-card">
+                <h4>📊 MAE</h4>
+                <div class="value">${metrics.mae ? metrics.mae.toFixed(2) : 'N/A'} ${unit}</div>
+            </div>
         </div>
     `;
     
     document.getElementById('regressionForecastMetrics').innerHTML = metricsHtml;
     
-    // Формула
     const formulaHtml = `<div class="formula">${forecast.formula || 'Формула регрессии'}</div>`;
     document.getElementById('regressionForecastFormula').innerHTML = formulaHtml;
     
-    // График
     if (regressionChart) regressionChart.destroy();
     
     const allYears = [...forecast.historical.years, ...forecast.forecast_years];
@@ -491,9 +545,8 @@ function displayRegressionForecast(forecast) {
         options: {
             responsive: true,
             maintainAspectRatio: true,
-            interaction: { mode: 'index', intersect: false },
             plugins: {
-                legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 10 } },
+                legend: { position: 'top' },
                 tooltip: {
                     callbacks: {
                         label: function(context) {
@@ -510,7 +563,6 @@ function displayRegressionForecast(forecast) {
         }
     });
     
-    // Таблица прогнозов
     let tableHtml = `<table><thead><tr><th>Год</th><th>Прогноз экспорта</th><th>Прогноз импорта</th><th>Прогноз ВВП</th></tr></thead><tbody>`;
     for (let i = 0; i < forecast.forecast_years.length; i++) {
         tableHtml += `<tr>
@@ -524,131 +576,391 @@ function displayRegressionForecast(forecast) {
     document.getElementById('regressionForecastTable').innerHTML = tableHtml;
 }
 
+// ==================== КЛАСТЕРИЗАЦИЯ ====================
 
-// ==================== CSV ИМПОРТ ====================
+async function loadClusteringYears() {
+    try {
+        const response = await fetch('/api/clustering/available-years');
+        const result = await response.json();
+        if (result.years) {
+            const select = document.getElementById('clusteringYear');
+            if (select) {
+                result.years.forEach(year => {
+                    const option = document.createElement('option');
+                    option.value = year;
+                    option.textContent = year;
+                    select.appendChild(option);
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Error loading years:', error);
+    }
+}
 
-async function previewCSV() {
-    const file = document.getElementById('csvFile').files[0];
-    if (!file) {
-        alert('Выберите файл');
+async function runClustering() {
+    const year = document.getElementById('clusteringYear').value;
+    
+    showClusteringLoading();
+    
+    try {
+        const url = year ? `/api/clustering/analyze?year=${year}` : '/api/clustering/analyze';
+        const response = await fetch(url);
+        const result = await response.json();
+        
+        if (result.success) {
+            displayClusteringResults(result);
+        } else {
+            alert('Ошибка: ' + (result.error || 'Неизвестная ошибка'));
+            document.getElementById('clusteringResult').style.display = 'none';
+        }
+    } catch (error) {
+        alert('Ошибка: ' + error.message);
+        document.getElementById('clusteringResult').style.display = 'none';
+    } finally {
+        hideClusteringLoading();
+    }
+}
+
+function displayClusteringResults(results) {
+    document.getElementById('clusteringResult').style.display = 'block';
+    
+    if (results.elbow_analysis && results.elbow_analysis.k_values && results.elbow_analysis.k_values.length > 0) {
+        if (elbowChart) elbowChart.destroy();
+        
+        const kValues = results.elbow_analysis.k_values;
+        const inertias = results.elbow_analysis.inertias;
+        
+        const elbowCtx = document.getElementById('elbowChart').getContext('2d');
+        elbowChart = new Chart(elbowCtx, {
+            type: 'line',
+            data: {
+                labels: kValues.map(k => `k = ${k}`),
+                datasets: [{
+                    label: 'Инерция (WCSS)',
+                    data: inertias,
+                    borderColor: 'rgb(75, 192, 192)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                    tension: 0.1,
+                    fill: true,
+                    pointRadius: 5,
+                    pointHoverRadius: 7
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `Инерция: ${context.parsed.y.toFixed(2)}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: { title: { display: true, text: 'Количество кластеров (k)' }, ticks: { stepSize: 1 } },
+                    y: { title: { display: true, text: 'Инерция (WCSS)' } }
+                }
+            }
+        });
+    }
+    
+    const types = ['Передовые', 'Средние', 'Отстающие'];
+    const colorMap = { 'Передовые': '#2ecc71', 'Средние': '#f39c12', 'Отстающие': '#e74c3c' };
+    
+    let statsHtml = '';
+    types.forEach(type => {
+        const color = colorMap[type];
+        const clusterCountries = results.countries ? results.countries.filter(c => c.cluster_type === type) : [];
+        const actualSize = clusterCountries.length;
+        
+        let avgGdp = 0, avgExport = 0, avgImport = 0;
+        if (actualSize > 0) {
+            avgGdp = clusterCountries.reduce((sum, c) => sum + c.gdp_value, 0) / actualSize;
+            avgExport = clusterCountries.reduce((sum, c) => sum + c.export_value, 0) / actualSize;
+            avgImport = clusterCountries.reduce((sum, c) => sum + c.import_value, 0) / actualSize;
+        }
+        
+        statsHtml += `
+            <div class="cluster-card" style="border-top-color: ${color};">
+                <h4>${type}</h4>
+                <div class="cluster-size">Число стран: ${actualSize}</div>
+                <div class="cluster-avg">
+                    📊 Средний ВВП: ${avgGdp.toFixed(2)} млрд USD<br>
+                    📤 Средний экспорт: ${avgExport.toFixed(2)} млрд USD<br>
+                    📥 Средний импорт: ${avgImport.toFixed(2)} млрд USD
+                </div>
+            </div>
+        `;
+    });
+    document.getElementById('clusterStats').innerHTML = statsHtml;
+    
+    let countriesHtml = '';
+    types.forEach(type => {
+        const clusterCountries = results.countries ? results.countries.filter(c => c.cluster_type === type) : [];
+        if (clusterCountries.length > 0) {
+            const typeClass = type === 'Передовые' ? 'leading' : (type === 'Средние' ? 'middle' : 'lagging');
+            countriesHtml += `
+                <div class="cluster-group ${typeClass}">
+                    <h5>${type} (${clusterCountries.length} стран)</h5>
+                    ${clusterCountries.map(c => `<span class="country-tag">${c.country_name}</span>`).join('')}
+                </div>
+            `;
+        }
+    });
+    document.getElementById('clusterCountries').innerHTML = countriesHtml;
+    
+    if (clusterScatterChart) clusterScatterChart.destroy();
+    
+    const datasets = [];
+    const colors = {
+        'Передовые': 'rgba(46, 204, 113, 0.7)',
+        'Средние': 'rgba(243, 156, 18, 0.7)',
+        'Отстающие': 'rgba(231, 76, 60, 0.7)'
+    };
+    
+    types.forEach(type => {
+        const clusterCountries = results.countries ? results.countries.filter(c => c.cluster_type === type) : [];
+        if (clusterCountries.length > 0) {
+            datasets.push({
+                label: type,
+                data: clusterCountries.map(c => ({
+                    x: c.export_value || 0,
+                    y: c.gdp_value || 0,
+                    countryName: c.country_name
+                })),
+                backgroundColor: colors[type],
+                borderColor: colors[type].replace('0.7', '1'),
+                borderWidth: 1,
+                pointRadius: 8,
+                pointHoverRadius: 10
+            });
+        }
+    });
+    
+    if (datasets.length > 0) {
+        const scatterCtx = document.getElementById('clusterChart').getContext('2d');
+        clusterScatterChart = new Chart(scatterCtx, {
+            type: 'scatter',
+            data: { datasets: datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const value = context.raw;
+                                return `${value.countryName}: ${context.dataset.label}\nЭкспорт: ${value.x.toFixed(2)} млрд USD\nВВП: ${value.y.toFixed(2)} млрд USD`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: { title: { display: true, text: 'Экспорт (млрд USD)' }, beginAtZero: true },
+                    y: { title: { display: true, text: 'ВВП (млрд USD)' }, beginAtZero: true }
+                }
+            }
+        });
+    }
+}
+
+// ==================== КРИТЕРИЙ ИРВИНА ====================
+
+async function checkIrwin() {
+    const countryId = document.getElementById('countrySelect').value;
+    if (!countryId) {
+        alert('Сначала выберите страну');
+        return;
+    }
+    const indicator = document.getElementById('irwinIndicator').value;
+    const threshold = parseFloat(document.getElementById('irwinThreshold').value);
+    
+    const url = `/api/irwin/${countryId}/${indicator}?threshold=${threshold}`;
+    
+    try {
+        const response = await fetch(url);
+        const result = await response.json();
+        if (result.success) {
+            displayIrwinResults(result);
+        } else {
+            alert('Ошибка: ' + (result.error || 'Неизвестная ошибка'));
+            document.getElementById('irwinResult').style.display = 'none';
+        }
+    } catch (error) {
+        alert('Ошибка: ' + error.message);
+    }
+}
+
+function displayIrwinResults(data) {
+    const resultDiv = document.getElementById('irwinResult');
+    resultDiv.style.display = 'block';
+    
+    let statsHtml = `
+        <div class="irwin-stats">
+            <div class="metric-card">
+                <h4>📏 Порог (λ)</h4>
+                <div class="value">${data.threshold}</div>
+            </div>
+            <div class="metric-card">
+                <h4>📊 СКО разностей</h4>
+                <div class="value">${data.sigma_diff?.toFixed(4) || 'N/A'}</div>
+            </div>
+            <div class="metric-card">
+                <h4>⚠️ Найдено аномалий</h4>
+                <div class="value">${data.outlier_count}</div>
+            </div>
+    `;
+    
+    if (data.trend_test) {
+        const tt = data.trend_test;
+        const significantText = tt.significant ? '✅ значим' : '❌ не значим';
+        statsHtml += `
+            <div class="metric-card">
+                <h4>📈 Наклон тренда</h4>
+                <div class="value">${tt.slope?.toFixed(4) || 'N/A'}</div>
+            </div>
+            <div class="metric-card">
+                <h4>🎯 t-статистика</h4>
+                <div class="value">${tt.t_statistic?.toFixed(4) || 'N/A'}</div>
+            </div>
+            <div class="metric-card">
+                <h4>📊 p-значение</h4>
+                <div class="value">${tt.p_value?.toExponential(4) || 'N/A'}</div>
+            </div>
+            <div class="metric-card">
+                <h4>📈 Тренд</h4>
+                <div class="value">${significantText}</div>
+            </div>
+        `;
+    }
+    statsHtml += `</div>`;
+    
+    const statsContainer = resultDiv.querySelector('.irwin-stats');
+    if (statsContainer) {
+        statsContainer.innerHTML = statsHtml;
+    } else {
+        resultDiv.innerHTML = `<div class="irwin-stats">${statsHtml}</div><div class="irwin-table-container"></div>`;
+    }
+    
+    const tableContainer = resultDiv.querySelector('.irwin-table-container');
+    if (tableContainer && data.outliers && data.outliers.length > 0) {
+        let tableHtml = `<h4>📋 Обнаруженные аномалии</h4>
+            <table class="data-table"><thead><tr>
+                <th>Год</th><th>Значение (млрд USD)</th><th>λ (Ирвина)</th><th>Предыдущее значение</th><th>Предыдущий год</th>
+            </tr></thead><tbody>`;
+        for (const o of data.outliers) {
+            tableHtml += `<tr>
+                <td>${o.year}</td>
+                <td>${o.value.toFixed(2)}</div>
+                <td class="${o.lambda > data.threshold ? 'significant' : ''}">${o.lambda.toFixed(4)}</div>
+                <td>${o.prev_value.toFixed(2)}</div>
+                <td>${o.prev_year}</div>
+            </tr>`;
+        }
+        tableHtml += `</tbody></table></div>`;
+        tableContainer.innerHTML = tableHtml;
+    } else if (tableContainer) {
+        tableContainer.innerHTML = `<div class="info-message">✅ Аномалий не обнаружено.</div>`;
+    }
+}
+
+// ==================== СТАТИСТИКИ РЕГРЕССИИ ====================
+
+async function loadRegressionStats() {
+    const countryId = document.getElementById('countrySelect').value;
+    if (!countryId) {
+        alert('Сначала выберите страну');
+        return;
+    }
+    const modelType = document.getElementById('statsModelType').value;
+    
+    const url = `/api/regression/stats/${countryId}?model=${modelType}`;
+    
+    try {
+        const response = await fetch(url);
+        const result = await response.json();
+        if (result.success) {
+            displayRegressionStats(result);
+        } else {
+            alert('Ошибка: ' + (result.error || 'Неизвестная ошибка'));
+            document.getElementById('regressionStatsResult').style.display = 'none';
+        }
+    } catch (error) {
+        alert('Ошибка: ' + error.message);
+    }
+}
+
+function displayRegressionStats(data) {
+    const container = document.getElementById('regressionStatsResult');
+    container.style.display = 'block';
+    
+    const stats = data.statistics;
+    if (!stats) {
+        container.innerHTML = `<div class="error-message">Нет статистических данных для модели ${data.model_type}</div>`;
         return;
     }
     
-    const formData = new FormData();
-    formData.append('file', file);
+    const metricsHtml = `
+        <div class="stats-metrics">
+            <div class="metric-card"><h4>R²</h4><div class="value">${stats.r2?.toFixed(4) || 'N/A'}</div></div>
+            <div class="metric-card"><h4>R² скорректированный</h4><div class="value">${stats.r2_adjusted?.toFixed(4) || 'N/A'}</div></div>
+            <div class="metric-card"><h4>Стандартная ошибка</h4><div class="value">${stats.residual_std_error?.toFixed(2) || 'N/A'}</div></div>
+        </div>
+    `;
     
-    try {
-        const response = await fetch('/api/csv/preview', { method: 'POST', body: formData });
-        const result = await response.json();
-        const previewDiv = document.getElementById('previewContainer');
-        
-        if (result.success) {
-            previewDiv.style.display = 'block';
-            
-            let tableHtml = `
-                <div class="preview-container">
-                    <h4>📋 Предпросмотр</h4>
-            `;
-            
-            // Проверяем, что preview — массив объектов
-            if (result.preview && Array.isArray(result.preview) && result.preview.length > 0) {
-                tableHtml += '<div style="overflow-x: auto;">';
-                tableHtml += '<table class="preview-table" border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse; width: 100%;">';
-                
-                // Заголовки таблицы (ключи первого объекта)
-                const headers = Object.keys(result.preview[0]);
-                tableHtml += '<thead><tr>';
-                headers.forEach(header => {
-                    tableHtml += `<th style="background-color: #f2f2f2; padding: 8px; text-align: left;">${escapeHtml(header)}</th>`;
-                });
-                tableHtml += '</tr></thead><tbody>';
-                
-                // Строки данных
-                result.preview.forEach(row => {
-                    tableHtml += '<tr>';
-                    headers.forEach(header => {
-                        let value = row[header] !== undefined && row[header] !== null ? row[header] : '';
-                        tableHtml += `<td style="padding: 8px;">${escapeHtml(String(value))}</td>`;
-                    });
-                    tableHtml += '</tr>';
-                });
-                
-                tableHtml += '</tbody></table></div>';
-            } else {
-                tableHtml += '<p>Нет данных для предпросмотра</p>';
-            }
-            
-            // Отображение определённого соответствия колонок
-            if (result.detected_mapping && Object.keys(result.detected_mapping).length) {
-                tableHtml += '<p><strong>Определено соответствие:</strong></p><ul>';
-                for (const [key, value] of Object.entries(result.detected_mapping)) {
-                    tableHtml += `<li>${escapeHtml(key)}: ${value ? escapeHtml(value) : '❌ не найдено'}</li>`;
-                }
-                tableHtml += '</ul>';
-            }
-            
-            tableHtml += `
-                    <button onclick="importCSV()" class="btn-primary">🚀 Импортировать</button>
-                    <button onclick="document.getElementById('previewContainer').style.display='none'" class="btn-secondary">❌ Отмена</button>
-                </div>
-            `;
-            
-            previewDiv.innerHTML = tableHtml;
-        } else {
-            alert('Ошибка: ' + result.error);
-        }
-    } catch (error) {
-        alert('Ошибка: ' + error.message);
-    }
-}
-
-// Вспомогательная функция для экранирования HTML-символов (защита от XSS)
-function escapeHtml(str) {
-    if (!str) return '';
-    return str.replace(/[&<>]/g, function(m) {
-        if (m === '&') return '&amp;';
-        if (m === '<') return '&lt;';
-        if (m === '>') return '&gt;';
-        return m;
-    });
-}
-
-async function importCSV() {
-    const file = document.getElementById('csvFile').files[0];
-    const formData = new FormData();
-    formData.append('file', file);
+    let coeffHtml = `<div class="stats-coefficients"><h4>📈 Коэффициенты модели (t-критерий Стьюдента)</h4>
+        <table class="data-table"><thead><tr>
+            <th>Переменная</th><th>Коэффициент</th><th>Ст. ошибка</th><th>t-статистика</th><th>p-значение</th><th>Значимость</th>
+        </tr></thead><tbody>`;
     
-    try {
-        const response = await fetch('/api/csv/import', { method: 'POST', body: formData });
-        const result = await response.json();
-        const resultDiv = document.getElementById('importResult');
-        
-        if (result.success) {
-            resultDiv.innerHTML = `
-                <div class="success-message">
-                    <strong>✅ Импорт завершен!</strong><br>
-                    📊 Всего строк: ${result.total_rows}<br>
-                    💾 Импортировано: ${result.imported_rows}<br>
-                    ${result.errors?.length ? `<br>⚠️ Ошибок: ${result.errors.length}` : ''}
-                </div>
-            `;
-            setTimeout(() => {
-                loadCountries();
-                loadData();
-                document.getElementById('previewContainer').style.display = 'none';
-                document.getElementById('csvFile').value = '';
-                setTimeout(() => { resultDiv.innerHTML = ''; }, 3000);
-            }, 2000);
-        } else {
-            resultDiv.innerHTML = `<div class="error-message"><strong>❌ Ошибка:</strong><br>${result.errors.join('<br>')}</div>`;
-        }
-    } catch (error) {
-        alert('Ошибка: ' + error.message);
+    const ic = stats.coefficients.intercept;
+    const isInterceptSignificant = ic.p_value !== undefined && ic.p_value < 0.05;
+    coeffHtml += `<tr>
+        <td><strong>Свободный член</strong></td>
+        <td>${ic.value?.toFixed(4) || 'N/A'}</td>
+        <td>${ic.std_error?.toFixed(4) || 'N/A'}</td>
+        <td>${ic.t_statistic?.toFixed(4) || 'N/A'}</td>
+        <td>${ic.p_value?.toExponential(4) || 'N/A'}</td>
+        <td class="${isInterceptSignificant ? 'significant' : 'insignificant'}">${isInterceptSignificant ? '✓ значим' : '✗ не значим'}</td>
+    </tr>`;
+    
+    const featureNames = ['Экспорт', 'Импорт', 'Экспорт×Импорт', 'Экспорт²', 'Импорт²'];
+    for (let i = 0; i < stats.coefficients.features.length; i++) {
+        const f = stats.coefficients.features[i];
+        const isSignificant = f.p_value !== undefined && f.p_value < 0.05;
+        coeffHtml += `<tr>
+            <td>${featureNames[i] || `Признак ${i+1}`}</td>
+            <td>${f.value?.toFixed(4) || 'N/A'}</td>
+            <td>${f.std_error?.toFixed(4) || 'N/A'}</td>
+            <td>${f.t_statistic?.toFixed(4) || 'N/A'}</td>
+            <td>${f.p_value?.toExponential(4) || 'N/A'}</td>
+            <td class="${isSignificant ? 'significant' : 'insignificant'}">${isSignificant ? '✓ значим' : '✗ не значим'}</td>
+        </tr>`;
     }
+    coeffHtml += `</tbody></table></div>`;
+    
+    const f = stats.f_statistic;
+    const isModelSignificant = f.p_value !== undefined && f.p_value < 0.05;
+    let fHtml = `<div class="stats-f-test"><h4>📊 F-критерий Фишера (значимость модели)</h4>
+        <div class="info-message">
+            F-статистика: <strong>${f.value?.toFixed(4) || 'N/A'}</strong><br>
+            p-значение: <strong>${f.p_value?.toExponential(4) || 'N/A'}</strong><br>
+            Степени свободы: (${f.df_model}, ${f.df_residual})<br>
+            <span class="${isModelSignificant ? 'significant' : 'insignificant'}">${isModelSignificant ? '✓ Модель статистически значима' : '✗ Модель не значима'}</span>
+        </div>
+    </div>`;
+    
+    container.innerHTML = metricsHtml + coeffHtml + fHtml;
 }
 
-function downloadTemplate() {
-    window.location.href = '/api/csv/template';
+function showRegressionStats() {
+    const modelType = document.getElementById('regressionModelType').value;
+    document.getElementById('statsModelType').value = modelType;
+    loadRegressionStats();
+    document.getElementById('regressionStatsSection').scrollIntoView({ behavior: 'smooth' });
 }
 
 // ==================== УПРАВЛЕНИЕ ДАННЫМИ ====================
@@ -712,7 +1024,8 @@ async function deleteCountry() {
         alert('Выберите страну');
         return;
     }
-    const countryName = document.getElementById('deleteCountrySelect').options[document.getElementById('deleteCountrySelect').selectedIndex].text;
+    const select = document.getElementById('deleteCountrySelect');
+    const countryName = select.options[select.selectedIndex]?.text || '';
     if (!confirm(`ВНИМАНИЕ! Удалить страну "${countryName}" вместе со ВСЕМИ показателями?`)) return;
     
     try {
@@ -761,7 +1074,8 @@ async function deleteAllIndicators() {
         alert('Выберите страну');
         return;
     }
-    const countryName = document.getElementById('deleteCountryIndicatorsSelect').options[document.getElementById('deleteCountryIndicatorsSelect').selectedIndex].text;
+    const select = document.getElementById('deleteCountryIndicatorsSelect');
+    const countryName = select.options[select.selectedIndex]?.text || '';
     if (!confirm(`Удалить ВСЕ показатели страны "${countryName}"? Страна останется.`)) return;
     
     try {
@@ -779,213 +1093,123 @@ async function deleteAllIndicators() {
     }
 }
 
-// ==================== КЛАСТЕРИЗАЦИЯ ====================
+// ==================== CSV ИМПОРТ ====================
 
-async function loadClusteringYears() {
-    try {
-        const response = await fetch('/api/clustering/available-years');
-        const result = await response.json();
-        if (result.years) {
-            const select = document.getElementById('clusteringYear');
-            result.years.forEach(year => {
-                const option = document.createElement('option');
-                option.value = year;
-                option.textContent = year;
-                select.appendChild(option);
-            });
-        }
-    } catch (error) {
-        console.error('Error loading years:', error);
+async function previewCSV() {
+    const file = document.getElementById('csvFile').files[0];
+    if (!file) {
+        alert('Выберите файл');
+        return;
     }
-}
-
-async function runClustering() {
-    const year = document.getElementById('clusteringYear').value;
     
-    showClusteringLoading();
+    const formData = new FormData();
+    formData.append('file', file);
     
     try {
-        const url = year ? `/api/clustering/analyze?year=${year}` : '/api/clustering/analyze';
-        const response = await fetch(url);
+        const response = await fetch('/api/csv/preview', { method: 'POST', body: formData });
         const result = await response.json();
+        const previewDiv = document.getElementById('previewContainer');
         
         if (result.success) {
-            displayClusteringResults(result);
+            previewDiv.style.display = 'block';
+            
+            let tableHtml = `<div class="preview-container"><h4>📋 Предпросмотр</h4>`;
+            
+            if (result.preview && Array.isArray(result.preview) && result.preview.length > 0) {
+                tableHtml += '<div style="overflow-x: auto;"><table class="preview-table" border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse; width: 100%;">';
+                
+                const headers = Object.keys(result.preview[0]);
+                tableHtml += '<thead><tr>';
+                headers.forEach(header => {
+                    tableHtml += `<th style="background-color: #f2f2f2; padding: 8px; text-align: left;">${escapeHtml(header)}</th>`;
+                });
+                tableHtml += '</tr></thead><tbody>';
+                
+                result.preview.forEach(row => {
+                    tableHtml += '<tr>';
+                    headers.forEach(header => {
+                        let value = row[header] !== undefined && row[header] !== null ? row[header] : '';
+                        tableHtml += `<td style="padding: 8px;">${escapeHtml(String(value))}</td>`;
+                    });
+                    tableHtml += '</tr>';
+                });
+                
+                tableHtml += '</tbody></table></div>';
+            } else {
+                tableHtml += '<p>Нет данных для предпросмотра</p>';
+            }
+            
+            if (result.detected_mapping && Object.keys(result.detected_mapping).length) {
+                tableHtml += '<p><strong>Определено соответствие:</strong></p><ul>';
+                for (const [key, value] of Object.entries(result.detected_mapping)) {
+                    tableHtml += `<li>${escapeHtml(key)}: ${value ? escapeHtml(value) : '❌ не найдено'}</li>`;
+                }
+                tableHtml += '</ul>';
+            }
+            
+            tableHtml += `
+                <button onclick="importCSV()" class="btn-primary">🚀 Импортировать</button>
+                <button onclick="document.getElementById('previewContainer').style.display='none'" class="btn-secondary">❌ Отмена</button>
+            </div>`;
+            
+            previewDiv.innerHTML = tableHtml;
         } else {
-            alert('Ошибка: ' + (result.error || 'Неизвестная ошибка'));
-            document.getElementById('clusteringResult').style.display = 'none';
+            alert('Ошибка: ' + result.error);
         }
     } catch (error) {
         alert('Ошибка: ' + error.message);
-        document.getElementById('clusteringResult').style.display = 'none';
-    } finally {
-        hideClusteringLoading();
     }
 }
 
-function displayClusteringResults(results) {
-    document.getElementById('clusteringResult').style.display = 'block';
+async function importCSV() {
+    const file = document.getElementById('csvFile').files[0];
+    const formData = new FormData();
+    formData.append('file', file);
     
-    // График метода локтя
-    if (results.elbow_analysis && results.elbow_analysis.k_values && results.elbow_analysis.k_values.length > 0) {
-        if (elbowChart) elbowChart.destroy();
+    try {
+        const response = await fetch('/api/csv/import', { method: 'POST', body: formData });
+        const result = await response.json();
+        const resultDiv = document.getElementById('importResult');
         
-        const kValues = results.elbow_analysis.k_values;
-        const inertias = results.elbow_analysis.inertias;
-        
-        const elbowCtx = document.getElementById('elbowChart').getContext('2d');
-        elbowChart = new Chart(elbowCtx, {
-            type: 'line',
-            data: {
-                labels: kValues.map(k => `k = ${k}`),
-                datasets: [{
-                    label: 'Инерция (WCSS)',
-                    data: inertias,
-                    borderColor: 'rgb(75, 192, 192)',
-                    backgroundColor: 'rgba(75, 192, 192, 0.1)',
-                    tension: 0.1,
-                    fill: true,
-                    pointRadius: 5,
-                    pointHoverRadius: 7
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                plugins: {
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                return `Инерция: ${context.parsed.y.toFixed(2)}`;
-                            }
-                        }
-                    },
-                    // Опционально: подписать значения инерции над точками
-                    datalabels: {
-                        display: true,
-                        color: 'black',
-                        align: 'top',
-                        formatter: (value) => value.toFixed(0)
-                    }
-                },
-                scales: {
-                    x: { 
-                        title: { display: true, text: 'Количество кластеров (k)' },
-                        ticks: { stepSize: 1 }
-                    },
-                    y: { 
-                        title: { display: true, text: 'Инерция (WCSS)' },
-                        ticks: { callback: (value) => value.toFixed(0) }
-                    }
-                }
-            }
-        });
-    }
-    
-    // Статистика кластеров
-    const types = ['Передовые', 'Средние', 'Отстающие'];
-    const colorMap = { 'Передовые': '#2ecc71', 'Средние': '#f39c12', 'Отстающие': '#e74c3c' };
-    
-    let statsHtml = '';
-    types.forEach(type => {
-        const color = colorMap[type];
-        const clusterCountries = results.countries ? results.countries.filter(c => c.cluster_type === type) : [];
-        const actualSize = clusterCountries.length;
-        
-        let avgGdp = 0, avgExport = 0, avgImport = 0;
-        if (actualSize > 0) {
-            avgGdp = clusterCountries.reduce((sum, c) => sum + c.gdp_value, 0) / actualSize;
-            avgExport = clusterCountries.reduce((sum, c) => sum + c.export_value, 0) / actualSize;
-            avgImport = clusterCountries.reduce((sum, c) => sum + c.import_value, 0) / actualSize;
-        }
-        
-        statsHtml += `
-            <div class="cluster-card" style="border-top-color: ${color};">
-                <h4>${type}</h4>
-                <div class="cluster-size">Число стран: ${actualSize}</div>
-                <div class="cluster-avg">
-                    📊 Средний ВВП: ${avgGdp.toFixed(2)} млрд USD<br>
-                    📤 Средний экспорт: ${avgExport.toFixed(2)} млрд USD<br>
-                    📥 Средний импорт: ${avgImport.toFixed(2)} млрд USD
-                </div>
-            </div>
-        `;
-    });
-    document.getElementById('clusterStats').innerHTML = statsHtml;
-    
-    // Распределение стран
-    let countriesHtml = '';
-    types.forEach(type => {
-        const clusterCountries = results.countries ? results.countries.filter(c => c.cluster_type === type) : [];
-        if (clusterCountries.length > 0) {
-            const typeClass = type === 'Передовые' ? 'leading' : (type === 'Средние' ? 'middle' : 'lagging');
-            countriesHtml += `
-                <div class="cluster-group ${typeClass}">
-                    <h5>${type} (${clusterCountries.length} стран)</h5>
-                    ${clusterCountries.map(c => `<span class="country-tag">${c.country_name}</span>`).join('')}
+        if (result.success) {
+            resultDiv.innerHTML = `
+                <div class="success-message">
+                    <strong>✅ Импорт завершен!</strong><br>
+                    📊 Всего строк: ${result.total_rows}<br>
+                    💾 Импортировано: ${result.imported_rows}<br>
+                    ${result.errors?.length ? `<br>⚠️ Ошибок: ${result.errors.length}` : ''}
                 </div>
             `;
+            setTimeout(() => {
+                loadCountries();
+                loadData();
+                document.getElementById('previewContainer').style.display = 'none';
+                document.getElementById('csvFile').value = '';
+                setTimeout(() => { resultDiv.innerHTML = ''; }, 3000);
+            }, 2000);
+        } else {
+            resultDiv.innerHTML = `<div class="error-message"><strong>❌ Ошибка:</strong><br>${result.errors?.join('<br>') || result.error}</div>`;
         }
-    });
-    document.getElementById('clusterCountries').innerHTML = countriesHtml;
-    
-    // График кластеров
-    if (clusterScatterChart) clusterScatterChart.destroy();
-    
-    const datasets = [];
-    const colors = {
-        'Передовые': 'rgba(46, 204, 113, 0.7)',
-        'Средние': 'rgba(243, 156, 18, 0.7)',
-        'Отстающие': 'rgba(231, 76, 60, 0.7)'
-    };
-    
-    types.forEach(type => {
-        const clusterCountries = results.countries ? results.countries.filter(c => c.cluster_type === type) : [];
-        if (clusterCountries.length > 0) {
-            datasets.push({
-                label: type,
-                data: clusterCountries.map(c => ({
-                    x: c.export_value || 0,
-                    y: c.gdp_value || 0,
-                    countryName: c.country_name
-                })),
-                backgroundColor: colors[type],
-                borderColor: colors[type].replace('0.7', '1'),
-                borderWidth: 1,
-                pointRadius: 8,
-                pointHoverRadius: 10
-            });
-        }
-    });
-    
-    if (datasets.length > 0) {
-        const scatterCtx = document.getElementById('clusterChart').getContext('2d');
-        clusterScatterChart = new Chart(scatterCtx, {
-            type: 'scatter',
-            data: { datasets: datasets },
-            options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                plugins: {
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                const value = context.raw;
-                                return `${value.countryName}: ${context.dataset.label}\nЭкспорт: ${value.x.toFixed(2)} млрд USD\nВВП: ${value.y.toFixed(2)} млрд USD`;
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    x: { title: { display: true, text: 'Экспорт (млрд USD)' }, beginAtZero: true },
-                    y: { title: { display: true, text: 'ВВП (млрд USD)' }, beginAtZero: true }
-                }
-            }
-        });
+    } catch (error) {
+        alert('Ошибка: ' + error.message);
     }
+}
+
+function downloadTemplate() {
+    window.location.href = '/api/csv/template';
 }
 
 // ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/[&<>]/g, function(m) {
+        if (m === '&') return '&amp;';
+        if (m === '<') return '&lt;';
+        if (m === '>') return '&gt;';
+        return m;
+    });
+}
 
 function showForecastLoading() {
     const btn = document.querySelector('#forecastSection .btn-primary');
@@ -1038,199 +1262,80 @@ function hideClusteringLoading() {
     }
 }
 
+// ==================== ТРЕНДОВЫЙ АНАЛИЗ ====================
 
-// ==================== КРИТЕРИЙ ИРВИНА ====================
-async function checkIrwin() {
+async function loadTrendAnalysis() {
     const countryId = document.getElementById('countrySelect').value;
     if (!countryId) {
         alert('Сначала выберите страну');
         return;
     }
-    const indicator = document.getElementById('irwinIndicator').value;
-    const threshold = parseFloat(document.getElementById('irwinThreshold').value);
     
-    const url = `/api/irwin/${countryId}/${indicator}?threshold=${threshold}`;
+    const indicator = document.getElementById('trendIndicator').value;
     
     try {
-        const response = await fetch(url);
+        const response = await fetch(`/api/trend/${countryId}/${indicator}`);
         const result = await response.json();
+        
         if (result.success) {
-            displayIrwinResults(result);
+            displayTrendResults(result);
         } else {
             alert('Ошибка: ' + (result.error || 'Неизвестная ошибка'));
-            document.getElementById('irwinResult').style.display = 'none';
         }
     } catch (error) {
         alert('Ошибка: ' + error.message);
     }
 }
 
-function displayIrwinResults(data) {
-    const resultDiv = document.getElementById('irwinResult');
-    resultDiv.style.display = 'block';
-    
-    // Статистика
-    const statsHtml = `
-        <div class="irwin-stats">
-            <div class="metric-card">
-                <h4>📏 Порог (λ)</h4>
-                <div class="value">${data.threshold}</div>
-            </div>
-            <div class="metric-card">
-                <h4>📊 СКО разностей</h4>
-                <div class="value">${data.sigma_diff?.toFixed(4) || 'N/A'}</div>
-            </div>
-            <div class="metric-card">
-                <h4>⚠️ Найдено аномалий</h4>
-                <div class="value">${data.outlier_count}</div>
-            </div>
-        </div>
-    `;
-    resultDiv.querySelector('.irwin-stats').innerHTML = statsHtml;
-    
-    // Таблица аномалий
-    if (data.outliers && data.outliers.length > 0) {
-        let tableHtml = `<div class="irwin-table-container"><h4>📋 Обнаруженные аномалии</h4>
-            <table class="data-table"><thead><tr>
-                <th>Год</th><th>Значение (млрд USD)</th><th>λ (Ирвина)</th><th>Предыдущее значение</th><th>Предыдущий год</th>
-            </tr></thead><tbody>`;
-        for (const o of data.outliers) {
-            tableHtml += `<tr>
-                <td>${o.year}</td>
-                <td>${o.value.toFixed(2)}</td>
-                <td class="${o.lambda > data.threshold ? 'significant' : ''}">${o.lambda.toFixed(4)}</td>
-                <td>${o.prev_value.toFixed(2)}</td>
-                <td>${o.prev_year}</td>
-            </tr>`;
-        }
-        tableHtml += `</tbody></table></div>`;
-        resultDiv.querySelector('.irwin-table-container').innerHTML = tableHtml;
-    } else {
-        resultDiv.querySelector('.irwin-table-container').innerHTML = `<div class="info-message">✅ Аномалий не обнаружено.</div>`;
-    }
-}
-
-// ==================== СТАТИСТИКИ РЕГРЕССИИ (ФИШЕР, СТЬЮДЕНТ) ====================
-async function loadRegressionStats() {
-    const countryId = document.getElementById('countrySelect').value;
-    if (!countryId) {
-        alert('Сначала выберите страну');
-        return;
-    }
-    const modelType = document.getElementById('statsModelType').value;
-    
-    const url = `/api/regression/stats/${countryId}?model=${modelType}`;
-    
-    try {
-        const response = await fetch(url);
-        const result = await response.json();
-        if (result.success) {
-            displayRegressionStats(result);
-        } else {
-            alert('Ошибка: ' + (result.error || 'Неизвестная ошибка'));
-            document.getElementById('regressionStatsResult').style.display = 'none';
-        }
-    } catch (error) {
-        alert('Ошибка: ' + error.message);
-    }
-}
-
-function displayRegressionStats(data) {
-    const container = document.getElementById('regressionStatsResult');
+function displayTrendResults(data) {
+    const container = document.getElementById('trendResult');
     container.style.display = 'block';
     
+    const ts = data.trend_test;
     const stats = data.statistics;
-    if (!stats) {
-        container.innerHTML = `<div class="error-message">Нет статистических данных для модели ${data.model_type}. Для Ridge/Lasso статистики не рассчитываются.</div>`;
-        return;
-    }
     
-    // Блок метрик
-    const metricsHtml = `
+    const isSignificant = ts.significant;
+    
+    let html = `
         <div class="stats-metrics">
-            <div class="metric-card"><h4>R²</h4><div class="value">${stats.r2?.toFixed(4) || 'N/A'}</div></div>
-            <div class="metric-card"><h4>R² скорректированный</h4><div class="value">${stats.r2_adjusted?.toFixed(4) || 'N/A'}</div></div>
-            <div class="metric-card"><h4>Стандартная ошибка</h4><div class="value">${stats.residual_std_error?.toFixed(2) || 'N/A'}</div></div>
+            <div class="metric-card"><h4>📊 Период</h4><div class="value">${stats.n} лет</div></div>
+            <div class="metric-card"><h4>💰 Среднее значение</h4><div class="value">${stats.mean?.toFixed(2)} млрд USD</div></div>
+            <div class="metric-card"><h4>📈 Наклон тренда</h4><div class="value">${ts.slope?.toFixed(4)}</div></div>
+            <div class="metric-card"><h4>🎯 t-статистика</h4><div class="value">${ts.t_statistic?.toFixed(4)}</div></div>
+            <div class="metric-card"><h4>📊 p-значение</h4><div class="value">${ts.p_value?.toExponential(4)}</div></div>
+            <div class="metric-card"><h4>📈 Направление</h4><div class="value">${data.interpretation.direction}</div></div>
+            <div class="metric-card"><h4>💪 Сила тренда</h4><div class="value">${data.interpretation.strength}</div></div>
+        </div>
+        <div class="info-message ${isSignificant ? 'significant' : 'insignificant'}" style="text-align:center; font-size:16px;">
+            ${isSignificant ? '✅ Тренд статистически значим (p < 0.05)' : '❌ Тренд не значим (p ≥ 0.05)'}
         </div>
     `;
     
-    // Коэффициенты с t-статистиками и p-значениями
-    let coeffHtml = `<div class="stats-coefficients"><h4>📈 Коэффициенты модели (t-критерий Стьюдента)</h4>
-        <table class="data-table"><thead><tr>
-            <th>Переменная</th><th>Коэффициент</th><th>Ст. ошибка</th><th>t-статистика</th><th>p-значение</th><th>Значимость</th>
-        </tr></thead><tbody>`;
-    
-    // intercept
-    const ic = stats.coefficients.intercept;
-    coeffHtml += `<tr>
-        <td><strong>Свободный член</strong></td>
-        <td>${ic.value?.toFixed(4) || 'N/A'}</td>
-        <td>${ic.std_error?.toFixed(4) || 'N/A'}</td>
-        <td>${ic.t_statistic?.toFixed(4) || 'N/A'}</td>
-        <td>${ic.p_value?.toExponential(4) || 'N/A'}</td>
-        <td class="${ic.p_value < 0.05 ? 'significant' : 'insignificant'}">${ic.p_value < 0.05 ? '✓ значим' : '✗ не значим'}</td>
-    </tr>`;
-    
-    // признаки
-    const featureNames = ['Экспорт', 'Импорт', 'Экспорт×Импорт', 'Экспорт²', 'Импорт²'];
-    for (let i = 0; i < stats.coefficients.features.length; i++) {
-        const f = stats.coefficients.features[i];
-        coeffHtml += `<tr>
-            <td>${featureNames[i] || `Признак ${i+1}`}</td>
-            <td>${f.value?.toFixed(4) || 'N/A'}</td>
-            <td>${f.std_error?.toFixed(4) || 'N/A'}</td>
-            <td>${f.t_statistic?.toFixed(4) || 'N/A'}</td>
-            <td>${f.p_value?.toExponential(4) || 'N/A'}</td>
-            <td class="${f.p_value < 0.05 ? 'significant' : 'insignificant'}">${f.p_value < 0.05 ? '✓ значим' : '✗ не значим'}</td>
-        </tr>`;
-    }
-    coeffHtml += `</tbody></table></div>`;
-    
-    // F-тест
-    const f = stats.f_statistic;
-    let fHtml = `<div class="stats-f-test"><h4>📊 F-критерий Фишера (значимость модели)</h4>
-        <div class="info-message">
-            F-статистика: <strong>${f.value?.toFixed(4) || 'N/A'}</strong><br>
-            p-значение: <strong>${f.p_value?.toExponential(4) || 'N/A'}</strong><br>
-            Степени свободы: (${f.df_model}, ${f.df_residual})<br>
-            <span class="${f.p_value < 0.05 ? 'significant' : 'insignificant'}">${f.p_value < 0.05 ? '✓ Модель статистически значима' : '✗ Модель не значима'}</span>
-        </div>
-    </div>`;
-    
-    container.innerHTML = metricsHtml + coeffHtml + fHtml;
+    container.innerHTML = html;
 }
-
-// Функция для кнопки статистик внутри блока регрессии ВВП
-function showRegressionStats() {
-    const modelType = document.getElementById('regressionModelType').value;
-    document.getElementById('statsModelType').value = modelType; // синхронизируем
-    loadRegressionStats();
-    // прокрутим к блоку статистик
-    document.getElementById('regressionStatsSection').scrollIntoView({ behavior: 'smooth' });
-}
-
-
-
-
-// ==================== ОБРАБОТЧИКИ СОБЫТИЙ ====================
-document.getElementById('countrySelect').addEventListener('change', function() {
-    loadData();
-    loadDeleteIndicatorsSelect();
-    const show = this.value ? 'block' : 'none';
-    const forecastSection = document.getElementById('forecastSection');
-    const regressionSection = document.getElementById('regressionSection');
-    const irwinSection = document.getElementById('irwinSection');
-    const regressionStatsSection = document.getElementById('regressionStatsSection');
-    if (forecastSection) forecastSection.style.display = show;
-    if (regressionSection) regressionSection.style.display = show;
-    if (irwinSection) irwinSection.style.display = show;
-    if (regressionStatsSection) regressionStatsSection.style.display = show;
-});
 
 // ==================== ИНИЦИАЛИЗАЦИЯ ====================
 
 document.addEventListener('DOMContentLoaded', () => {
     loadCountries();
     loadData();
+    
+    const countrySelect = document.getElementById('countrySelect');
+    if (countrySelect) {
+        countrySelect.addEventListener('change', function() {
+            loadData();
+            loadDeleteIndicatorsSelect();
+            const show = this.value ? 'block' : 'none';
+            const forecastSection = document.getElementById('forecastSection');
+            const regressionSection = document.getElementById('regressionSection');
+            const irwinSection = document.getElementById('irwinSection');
+            const regressionStatsSection = document.getElementById('regressionStatsSection');
+            const trendSection = document.getElementById('trendSection');
+            if (forecastSection) forecastSection.style.display = show;
+            if (regressionSection) regressionSection.style.display = show;
+            if (irwinSection) irwinSection.style.display = show;
+            if (regressionStatsSection) regressionStatsSection.style.display = show;
+            if (trendSection) trendSection.style.display = show;
+        });
+    }
 });
-

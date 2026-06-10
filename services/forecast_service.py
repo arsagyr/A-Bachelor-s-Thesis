@@ -1,10 +1,10 @@
 import numpy as np
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from database import with_db_connection
 from repositories.country_repository import CountryRepository
 from repositories.indicator_repository import IndicatorRepository
 from repositories.statistics_repository import StatisticsRepository
-from calculations.auto_regression import auto_regression_forecast, compare_auto_regression_models
+from calculations.auto_regression import auto_regression_forecast, compare_auto_regression_models, irwin_criterion, t_test_slope
 
 
 class ForecastService:
@@ -19,10 +19,25 @@ class ForecastService:
     }
 
     @staticmethod
+    def _get_trend_strength(t_statistic: float, n: int) -> str:
+        """Оценка силы тренда на основе t-статистики."""
+        if t_statistic > 10:
+            return "Очень сильный"
+        elif t_statistic > 5:
+            return "Сильный"
+        elif t_statistic > 3:
+            return "Умеренный"
+        elif t_statistic > 2:
+            return "Слабый"
+        else:
+            return "Очень слабый или отсутствует"
+
+    @staticmethod
     @with_db_connection
     def check_irwin(conn, country_id: int, indicator: str, threshold: float = 3.0) -> Dict[str, Any]:
         """
         Проверка временного ряда на аномалии по критерию Ирвина.
+        Дополнительно выводит t-статистику и p-значение для тренда.
         """
         ind_repo = IndicatorRepository(conn)
         indicator_obj = ind_repo.get_by_name(indicator)
@@ -43,15 +58,24 @@ class ForecastService:
         years = [y for y, _ in hist]
         values = [v for _, v in hist]
 
-        from calculations.auto_regression import irwin_criterion
-        result = irwin_criterion(values, threshold)
+        # Критерий Ирвина
+        irwin_result = irwin_criterion(values, threshold)
 
-        if result.get('error'):
-            return {'success': False, 'error': result['error']}
+        if irwin_result.get('error'):
+            return {'success': False, 'error': irwin_result['error']}
+
+        # t-тест значимости тренда (Стьюдент)
+        ttest_result = t_test_slope(values, alpha=0.05)
 
         country_repo = CountryRepository(conn)
         country = country_repo.get_by_id(country_id)
         country_name = country.name if country else 'Unknown'
+
+        indicator_names = {
+            'export_value': 'Экспорт',
+            'import_value': 'Импорт',
+            'gdp_value': 'ВВП',
+        }
 
         outliers_with_years = [
             {
@@ -61,18 +85,117 @@ class ForecastService:
                 'prev_value': o['prev_value'],
                 'prev_year': years[o['index'] - 1],
             }
-            for o in result.get('outliers', [])
+            for o in irwin_result.get('outliers', [])
         ]
+
+        # Формируем ответ
+        response = {
+            'success': True,
+            'country_name': country_name,
+            'indicator_name': indicator_names.get(indicator, indicator),
+            'threshold': threshold,
+            'sigma_diff': irwin_result['sigma_diff'],
+            'outliers': outliers_with_years,
+            'outlier_count': irwin_result['outlier_count'],
+            'all_lambda': irwin_result['all_lambda'],
+        }
+
+        # Добавляем t-тест, если он успешен
+        if 'error' not in ttest_result:
+            response['trend_test'] = {
+                'slope': ttest_result['slope'],
+                'std_error': ttest_result['std_error'],
+                't_statistic': ttest_result['t_statistic'],
+                'p_value': ttest_result['p_value'],
+                'significant': ttest_result['significant'],
+                'alpha': ttest_result['alpha'],
+                'interpretation': 'Тренд статистически значим' if ttest_result['significant'] else 'Тренд не значим'
+            }
+        else:
+            response['trend_test'] = {'error': ttest_result['error']}
+
+        return response
+
+    @staticmethod
+    @with_db_connection
+    def check_trend_significance(conn, country_id: int, indicator: str, alpha: float = 0.05) -> Dict[str, Any]:
+        """
+        Отдельный метод для проверки значимости тренда по t-критерию Стьюдента.
+        """
+        ind_repo = IndicatorRepository(conn)
+        indicator_obj = ind_repo.get_by_name(indicator)
+        if not indicator_obj:
+            return {'success': False, 'error': f'Неизвестный индикатор: {indicator}'}
+
+        stats_repo = StatisticsRepository(conn)
+        all_stats = stats_repo.get_by_country(country_id)
+        hist = sorted(
+            [(s.year, s.value) for s in all_stats
+             if s.indicator_id == indicator_obj.id and s.value is not None],
+            key=lambda x: x[0],
+        )
+
+        if len(hist) < 3:
+            return {'success': False, 'error': f'Недостаточно данных: {len(hist)} точек'}
+
+        years = [y for y, _ in hist]
+        values = [v for _, v in hist]
+
+        ttest_result = t_test_slope(values, alpha=alpha)
+
+        if 'error' in ttest_result:
+            return {'success': False, 'error': ttest_result['error']}
+
+        country_repo = CountryRepository(conn)
+        country = country_repo.get_by_id(country_id)
+        country_name = country.name if country else 'Unknown'
+
+        indicator_names = {
+            'export_value': 'Экспорт',
+            'import_value': 'Импорт',
+            'gdp_value': 'ВВП',
+        }
+
+        # Расчёт дополнительных метрик
+        n = len(values)
+        mean_value = np.mean(values)
+        std_value = np.std(values, ddof=1)
+        cv = std_value / mean_value * 100 if mean_value != 0 else None
+
+        # Годовой темп роста (средний)
+        if n > 1:
+            growth_rates = [(values[i] - values[i-1]) / values[i-1] * 100 for i in range(1, n) if values[i-1] != 0]
+            avg_growth_rate = np.mean(growth_rates) if growth_rates else None
+        else:
+            avg_growth_rate = None
 
         return {
             'success': True,
             'country_name': country_name,
-            'indicator_name': indicator,
-            'threshold': threshold,
-            'sigma_diff': result['sigma_diff'],
-            'outliers': outliers_with_years,
-            'outlier_count': result['outlier_count'],
-            'all_lambda': result['all_lambda'],
+            'indicator_name': indicator_names.get(indicator, indicator),
+            'years': years,
+            'values': values,
+            'statistics': {
+                'n': n,
+                'mean': float(mean_value),
+                'std': float(std_value),
+                'cv_percent': float(cv) if cv is not None else None,
+                'avg_growth_rate_percent': float(avg_growth_rate) if avg_growth_rate is not None else None,
+            },
+            'trend_test': {
+                'slope': float(ttest_result['slope']),
+                'std_error': float(ttest_result['std_error']),
+                't_statistic': float(ttest_result['t_statistic']),
+                'p_value': float(ttest_result['p_value']),
+                'alpha': ttest_result['alpha'],
+                'significant': ttest_result['significant'],
+                'critical_value': round(ttest_result['t_statistic'], 4) if abs(ttest_result['t_statistic']) > 0 else None,
+            },
+            'interpretation': {
+                'trend': 'Тренд статистически значим' if ttest_result['significant'] else 'Тренд не значим',
+                'direction': 'Положительный (рост)' if ttest_result['slope'] > 0 else 'Отрицательный (снижение)',
+                'strength': ForecastService._get_trend_strength(abs(ttest_result['t_statistic']), n)
+            }
         }
 
     @staticmethod
@@ -174,6 +297,16 @@ class ForecastService:
             'degree': result.get('degree', degree),
         }
 
+        # Добавляем t-тест значимости тренда для полученной модели
+        ttest_result = t_test_slope(historical_values, alpha=0.05)
+        if 'error' not in ttest_result:
+            response['trend_significance'] = {
+                't_statistic': ttest_result['t_statistic'],
+                'p_value': ttest_result['p_value'],
+                'significant': ttest_result['significant'],
+                'interpretation': 'Тренд статистически значим' if ttest_result['significant'] else 'Тренд не значим'
+            }
+
         # Модельные предсказания по всей оси t (исторические + прогнозные)
         n = len(historical_values)
         model_predictions = []
@@ -202,3 +335,41 @@ class ForecastService:
             response['best_r2'] = result.get('best_r2')
 
         return response
+
+    @staticmethod
+    @with_db_connection
+    def compare_trends(conn, country_id: int) -> Dict[str, Any]:
+        """
+        Сравнение трендов для экспорта, импорта и ВВП одной страны.
+        """
+        indicators = ['export_value', 'import_value', 'gdp_value']
+        results = {}
+
+        for indicator in indicators:
+            result = ForecastService.check_trend_significance(conn, country_id, indicator)
+            if result.get('success'):
+                # Извлекаем название индикатора для отображения
+                ind_name = result['indicator_name']
+                results[ind_name] = {
+                    'indicator_name': ind_name,
+                    'trend_significant': result['trend_test']['significant'],
+                    't_statistic': result['trend_test']['t_statistic'],
+                    'p_value': result['trend_test']['p_value'],
+                    'slope': result['trend_test']['slope'],
+                    'direction': result['interpretation']['direction'],
+                    'strength': result['interpretation']['strength'],
+                    'mean_value': result['statistics']['mean'],
+                    'avg_growth_rate': result['statistics'].get('avg_growth_rate_percent'),
+                }
+            else:
+                results[indicator] = {'error': result.get('error')}
+
+        country_repo = CountryRepository(conn)
+        country = country_repo.get_by_id(country_id)
+        country_name = country.name if country else 'Unknown'
+
+        return {
+            'success': True,
+            'country_name': country_name,
+            'results': results
+        }

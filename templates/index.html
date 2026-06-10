@@ -238,6 +238,26 @@
                 </div>
             </div>
 
+            <!-- Трендовый анализ (t-тест Стьюдента) -->
+            <div class="trend-section" id="trendSection" style="display:none;">
+                <h3>📈 Анализ значимости тренда (t-критерий Стьюдента)</h3>
+                <div class="trend-controls">
+                    <div class="control-group">
+                        <label>📊 Показатель</label>
+                        <select id="trendIndicator">
+                            <option value="export">Экспорт</option>
+                            <option value="import">Импорт</option>
+                            <option value="gdp">ВВП</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>&nbsp;</label>
+                        <button onclick="loadTrendAnalysis()" class="btn-primary" style="background: linear-gradient(135deg, #1abc9c 0%, #16a085 100%);">📈 Анализировать тренд</button>
+                    </div>
+                </div>
+                <div id="trendResult" style="display:none;"></div>
+            </div>
+            
             <!-- Статистики регрессии (Фишер, Стьюдент) -->
             <div class="regression-stats-section" id="regressionStatsSection" style="display:none;">
                 <h3>📊 Статистическая значимость регрессии (t-критерий Стьюдента, F-критерий Фишера)</h3>
